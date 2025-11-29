@@ -1,125 +1,15 @@
+use crate::memory_map::{maybe_hex_str_or_unsigned, Protocol};
 use anyhow::anyhow;
 use derive_more::Display;
 use log::error;
-use schemars::schema_for;
 use schemars::JsonSchema;
-#[cfg(test)]
-use serde::de::value::{Error as ValueError, I64Deserializer, StrDeserializer};
-#[cfg(test)]
-use serde::de::IntoDeserializer;
-use serde::de::{Error, Unexpected, Visitor};
+use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize};
-use serde_json::ser::PrettyFormatter;
 use std::collections::HashMap;
-use std::fmt;
-
-fn hex_str_or_unsigned<'de, D>(deserializer: D) -> Result<u64, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    struct HexVisitor;
-
-    impl Visitor<'_> for HexVisitor {
-        type Value = u64;
-
-        fn expecting(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-            fmt.write_str("\"0x\" prefixed hex string or u64")
-        }
-
-        fn visit_i64<E>(self, val: i64) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
-        {
-            if val >= 0 {
-                Ok(val as u64)
-            } else {
-                Err(E::invalid_value(Unexpected::Signed(val), &self))
-            }
-        }
-
-        fn visit_u64<E>(self, val: u64) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
-        {
-            Ok(val)
-        }
-
-        fn visit_str<E>(self, val: &str) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
-        {
-            let error = E::invalid_value(Unexpected::Str(val), &self);
-            if let Some(stripped) = val.strip_prefix("0x") {
-                let deformat = stripped.to_string().replace("_", "");
-                match u64::from_str_radix(&deformat, 16) {
-                    Ok(parsed_int) => Ok(parsed_int),
-                    Err(_) => Err(error),
-                }
-            } else {
-                Err(error)
-            }
-        }
-    }
-
-    deserializer.deserialize_any(HexVisitor)
-}
-
-#[test]
-fn test_hex_str_ok() {
-    let deserializer: StrDeserializer<ValueError> = "0xffff".into_deserializer();
-    assert_eq!(hex_str_or_unsigned(deserializer), Ok(65535));
-}
-
-#[test]
-fn test_hex_str_err() {
-    let deserializer: StrDeserializer<ValueError> = "ffff".into_deserializer();
-    assert_eq!(
-        hex_str_or_unsigned(deserializer).unwrap_err().to_string(),
-        "invalid value: string \"ffff\", expected \"0x\" prefixed hex string or u64"
-    );
-}
-
-#[test]
-fn test_negative_i64_err() {
-    let deserializer: I64Deserializer<ValueError> = (-1i64).into_deserializer();
-    assert_eq!(
-        hex_str_or_unsigned(deserializer).unwrap_err().to_string(),
-        "invalid value: integer `-1`, expected \"0x\" prefixed hex string or u64"
-    );
-}
-
-#[test]
-fn test_positive_i64_ok() {
-    let deserializer: I64Deserializer<ValueError> = (1i64).into_deserializer();
-    assert_eq!(hex_str_or_unsigned(deserializer), Ok(1));
-}
-
-fn maybe_hex_str_or_unsigned<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    Ok(Some(hex_str_or_unsigned(deserializer)?))
-}
-
-#[derive(Deserialize, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct Protocol {
-    /// An optional name for the protocol
-    name: Option<String>,
-    /// Maximum address in terms of addressUnit.
-    /// Accepts '0x' prefixed hex strings with underscores allowed between digits to enhance readability
-    #[serde(deserialize_with = "hex_str_or_unsigned")]
-    address_max: u64,
-    /// Number of bytes accessed with one address
-    address_unit: u64,
-    /// Number of bytes aligned with the protocol's minimum transfer size. Must be greater or equal
-    /// to addressUnit
-    address_align: u64,
-}
 
 #[derive(Deserialize, Serialize, JsonSchema)]
 #[serde(untagged)]
-pub enum BitfieldStyle {
+pub enum BitfieldPattern {
     /// Contiguous array of bit names starting at index 0.
     /// If array length is shorter than the field, the remainging bits are marked as 'Reserved'
     FromZero(Vec<String>),
@@ -145,7 +35,7 @@ pub enum FieldType {
     /// Bitfield with named indices
     /// Represented by the vhdl type `std_logic_vector(length-1 downto 0)`
     #[display("Bitfield length {}", length)]
-    Bitfield { length: u32, bits: BitfieldStyle },
+    Bitfield { length: u32, bits: BitfieldPattern },
     /// Unsigned numeric type; value is length of the field in bits.
     /// Defined by length and representing the vhdl type `signed(length-1 downto 0)`.
     #[display("unsigned({} downto 0)", _0-1)]
@@ -223,33 +113,36 @@ pub enum Value {
     Float(f64),
 }
 
-#[derive(Deserialize, Serialize, JsonSchema, Default, Debug, Copy, Clone)]
+#[derive(Deserialize, Serialize, JsonSchema, Display, Default, Debug, Copy, Clone)]
 pub enum Access {
     /// Read-only access is permitted
     #[default]
     #[serde(rename = "r")]
+    #[display("Read-only")]
     Read,
     /// Write-only access is permitted
     #[serde(rename = "w")]
+    #[display("Write-only")]
     Write,
     /// Both read and write access is permitted
     #[serde(rename = "rw")]
+    #[display("Read/Write")]
     ReadWrite,
 }
 
 #[derive(Deserialize, Serialize, JsonSchema)]
 pub struct Field {
     name: String,
-    /// Memory address. If no address is provided, the renderer will assume the field
+    /// Memory address. If no address is provided, elaboration assumes the field
     /// is packed directly following the previously defined address. If padding is desired to
     /// ensure allignment to Protocol.address_align, and the data type is smaller than address_align, it is
-    /// required to explicitly specify the address. If no prior field exists, the renderer will
-    /// either inherit the address of the parent FieldType::Set or start at zero.
+    /// required to explicitly specify the address. If no prior field exists, elaboration
+    /// either inherits the address of the parent FieldType::Set or starts at zero.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default, deserialize_with = "maybe_hex_str_or_unsigned")]
     address: Option<u64>,
     /// Register access permission.
-    /// If no access permission is specified, the renterer will assume the field inherits
+    /// If no access permission is specified, elaboration assumes the field inherits
     /// access from its parent context.
     #[serde(skip_serializing_if = "Option::is_none")]
     access: Option<Access>,
@@ -272,19 +165,6 @@ pub struct Field {
     /// The maximum allowed value of a numeric type. Ignored for other types.
     #[serde(skip_serializing_if = "Option::is_none")]
     max: Option<f64>,
-}
-
-#[derive(Deserialize, Serialize, JsonSchema)]
-pub struct MemoryMap {
-    protocol: Protocol,
-    #[serde(flatten)]
-    field: Field,
-}
-
-impl MemoryMap {
-    pub fn elaborate(&mut self) -> Result<(), anyhow::Error> {
-        self.field.elaborate(&self.protocol)
-    }
 }
 
 impl Field {
@@ -357,7 +237,7 @@ impl Field {
                     (((*high - *low + 1) as f64) / 8f64).ceil() as u64
                 }
                 FieldType::Set => {
-                    panic!()
+                    panic!() // This case is handled above so arriving here is impossible
                 }
             };
             if self.access.is_none() {
@@ -593,13 +473,4 @@ impl Field {
         }
         Ok(())
     }
-}
-
-pub fn get_memory_map_schema() -> String {
-    let schema = schema_for!(MemoryMap);
-    let formatter = PrettyFormatter::with_indent(b"    ");
-    let mut buf = Vec::new();
-    let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-    serde::Serialize::serialize(&schema, &mut ser).expect("Failed to serialize schema");
-    String::from_utf8(buf).expect("Failed to convert serial buffer to string")
 }

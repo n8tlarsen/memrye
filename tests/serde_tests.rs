@@ -1,7 +1,5 @@
-use serde_json;
 use std::fs;
-use toml;
-use vhdl_doc::memory_map::schema::MemoryMap;
+use vhdl_doc::memory_map::MemoryMap;
 
 #[test]
 pub fn toml_to_json() {
