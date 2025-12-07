@@ -1,18 +1,65 @@
+pub mod array;
+pub mod cluster;
+pub mod entry;
 pub mod field;
 pub mod memory_map;
 pub mod protocol;
+// pub mod reference;
 
+pub use array::Array;
+pub use cluster::Cluster;
+// pub use composite::Composite;
+pub use entry::Entry;
 pub use field::Field;
 pub use memory_map::MemoryMap;
 pub use protocol::Protocol;
 
+use derive_more::Display;
+use schemars::JsonSchema;
 #[cfg(test)]
 use serde::de::value::{Error as ValueError, I64Deserializer, StrDeserializer};
 #[cfg(test)]
 use serde::de::IntoDeserializer;
 use serde::de::{Unexpected, Visitor};
-use serde::Deserializer;
+use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt;
+
+#[derive(Deserialize, Serialize, JsonSchema, Display, Default, Debug, Copy, Clone)]
+pub enum Access {
+    /// Read-only access is permitted
+    #[default]
+    #[serde(rename = "r")]
+    #[display("Read-only")]
+    Read,
+    /// Write-only access is permitted
+    #[serde(rename = "w")]
+    #[display("Write-only")]
+    Write,
+    /// Both read and write access is permitted
+    #[serde(rename = "rw")]
+    #[display("Read/Write")]
+    ReadWrite,
+}
+
+#[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
+#[serde(untagged)]
+pub enum Composite {
+    Array(Array),
+    Cluster(Cluster),
+    Entry(Entry),
+    Reference {
+        #[serde(rename = "@ref")]
+        #[garde(pattern(r"[-_ A-Za-z0-9\/]*"))]
+        reference: String,
+    },
+}
+
+#[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
+#[serde(untagged)]
+pub enum OneOrMoreComposites {
+    One(Composite),
+    More(Vec<Composite>),
+}
 
 fn hex_str_or_unsigned<'de, D>(deserializer: D) -> Result<u64, D::Error>
 where

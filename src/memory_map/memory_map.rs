@@ -1,4 +1,5 @@
-use super::{Field, Protocol};
+use super::OneOrMoreComposites;
+use super::{Composite, Protocol};
 use schemars::schema_for;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -7,19 +8,31 @@ use std::io::Write;
 
 #[derive(Deserialize, Serialize, JsonSchema)]
 pub struct MemoryMap {
-    protocol: Protocol,
     #[serde(flatten)]
-    field: Field,
+    protocol: Protocol,
+    #[serde(rename = "@map")]
+    map: OneOrMoreComposites,
+    #[serde(rename = "@def")]
+    def: Option<OneOrMoreComposites>,
 }
 
 impl MemoryMap {
     pub fn elaborate(&mut self) -> Result<(), anyhow::Error> {
-        self.field.elaborate(&self.protocol)
+        // self.field.elaborate(&self.protocol)
+        Ok(())
     }
 
     pub fn render(&self) -> String {
+        // self.render_recursive()
         "".to_string()
     }
+
+    // fn render_recursive(&self) -> String {
+    //     if let FieldType::Set = &self.field_type {
+    //     } else {
+    //     }
+    //     "".to_string()
+    // }
 
     pub fn render_to_writer<W, E>(&self, writer: W) -> Result<(), E>
     where

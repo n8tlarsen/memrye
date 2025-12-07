@@ -1,0 +1,481 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "MemoryMap",
+    "type": "object",
+    "properties": {
+        "name": {
+            "description": "An optional name for the protocol",
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "addressMax": {
+            "description": "Maximum address in terms of addressUnit.\nAccepts '0x' prefixed hex strings with underscores allowed between digits to enhance readability",
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+        },
+        "addressUnit": {
+            "description": "Number of bytes accessed with one address",
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+        },
+        "addressAlign": {
+            "description": "Number of bytes aligned with the protocol's minimum transfer size. Must be greater or equal\nto addressUnit",
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+        },
+        "@map": {
+            "$ref": "#/$defs/OneOrMoreComposites"
+        },
+        "@def": {
+            "anyOf": [
+                {
+                    "$ref": "#/$defs/OneOrMoreComposites"
+                },
+                {
+                    "type": "null"
+                }
+            ]
+        }
+    },
+    "required": [
+        "addressMax",
+        "addressUnit",
+        "addressAlign",
+        "@map"
+    ],
+    "$defs": {
+        "OneOrMoreComposites": {
+            "anyOf": [
+                {
+                    "$ref": "#/$defs/Composite"
+                },
+                {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/Composite"
+                    }
+                }
+            ]
+        },
+        "Composite": {
+            "anyOf": [
+                {
+                    "$ref": "#/$defs/Array"
+                },
+                {
+                    "$ref": "#/$defs/Cluster"
+                },
+                {
+                    "$ref": "#/$defs/Entry"
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "@ref": {
+                            "type": "string",
+                            "pattern": "[-_ A-Za-z0-9\\/]*"
+                        }
+                    },
+                    "required": [
+                        "@ref"
+                    ]
+                }
+            ]
+        },
+        "Array": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "address": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "format": "uint64",
+                    "minimum": 0
+                },
+                "access": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Access"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "elements": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/Composite"
+                    }
+                },
+                "increment": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "format": "uint64",
+                    "minimum": 0,
+                    "default": null
+                },
+                "indexEnums": {
+                    "type": [
+                        "object",
+                        "null"
+                    ],
+                    "additionalProperties": {
+                        "type": "integer",
+                        "format": "uint64",
+                        "minimum": 0
+                    }
+                }
+            },
+            "required": [
+                "name",
+                "elements"
+            ]
+        },
+        "Access": {
+            "oneOf": [
+                {
+                    "description": "Read-only access is permitted",
+                    "type": "string",
+                    "const": "r"
+                },
+                {
+                    "description": "Write-only access is permitted",
+                    "type": "string",
+                    "const": "w"
+                },
+                {
+                    "description": "Both read and write access is permitted",
+                    "type": "string",
+                    "const": "rw"
+                }
+            ]
+        },
+        "Cluster": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "address": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "format": "uint64",
+                    "minimum": 0
+                },
+                "access": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Access"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "elements": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/Composite"
+                    }
+                }
+            },
+            "required": [
+                "name",
+                "elements"
+            ]
+        },
+        "Entry": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "address": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "format": "uint64",
+                    "minimum": 0
+                },
+                "access": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Access"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "fields": {
+                    "$ref": "#/$defs/EntryOption"
+                }
+            },
+            "required": [
+                "name",
+                "fields"
+            ]
+        },
+        "EntryOption": {
+            "anyOf": [
+                {
+                    "type": "null"
+                },
+                {
+                    "$ref": "#/$defs/Field"
+                },
+                {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/Field"
+                    }
+                }
+            ]
+        },
+        "Field": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "offset": {
+                    "description": "Bit offset from the beginning of the entry.\nIf no offset is provided, elaboration assumes the field is packed directly following the\npreviously defined field. If no prior field exists, elaboration assumes the field exists\nat offset zero.",
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "format": "uint64",
+                    "minimum": 0
+                },
+                "access": {
+                    "description": "Field accessibility.\nIf no accessibility is specified, elaboration assumes the field inherits\naccess from its parent context",
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Access"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "type": {
+                    "description": "Field type",
+                    "$ref": "#/$defs/FieldType"
+                },
+                "value": {
+                    "description": "The default value of the field.",
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Value"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "unit": {
+                    "description": "The unit of measurement of a numeric type. Ignored for other types.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "min": {
+                    "description": "The minimum allowed value of a numeric type. Ignored for other types.",
+                    "type": [
+                        "number",
+                        "null"
+                    ],
+                    "format": "double"
+                },
+                "max": {
+                    "description": "The maximum allowed value of a numeric type. Ignored for other types.",
+                    "type": [
+                        "number",
+                        "null"
+                    ],
+                    "format": "double"
+                }
+            },
+            "required": [
+                "name",
+                "type"
+            ]
+        },
+        "FieldType": {
+            "oneOf": [
+                {
+                    "description": "Single bit field\nRepresented by the vhdl type `std_logic`",
+                    "type": "string",
+                    "const": "bit"
+                },
+                {
+                    "description": "Enumerated type\nRepresented by the vhdl type `std_logic_vector(length-1 downto 0)`",
+                    "type": "object",
+                    "properties": {
+                        "enum": {
+                            "type": "object",
+                            "properties": {
+                                "length": {
+                                    "type": "integer",
+                                    "format": "uint32",
+                                    "minimum": 0
+                                },
+                                "map": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "integer",
+                                        "format": "uint64",
+                                        "minimum": 0
+                                    }
+                                }
+                            },
+                            "required": [
+                                "length",
+                                "map"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "enum"
+                    ],
+                    "additionalProperties": false
+                },
+                {
+                    "description": "Unsigned numeric type; value is length of the field in bits.\nDefined by length and representing the vhdl type `signed(length-1 downto 0)`.",
+                    "type": "object",
+                    "properties": {
+                        "unsigned": {
+                            "type": "integer",
+                            "format": "uint32",
+                            "minimum": 0
+                        }
+                    },
+                    "required": [
+                        "unsigned"
+                    ],
+                    "additionalProperties": false
+                },
+                {
+                    "description": "Signed numeric type; value is length of the field in bits.\nDefined by length and representing the vhdl type `unsigned(length-1 downto 0)`",
+                    "type": "object",
+                    "properties": {
+                        "signed": {
+                            "type": "integer",
+                            "format": "uint32",
+                            "minimum": 0
+                        }
+                    },
+                    "required": [
+                        "signed"
+                    ],
+                    "additionalProperties": false
+                },
+                {
+                    "description": "Unsigned fixed point numeric type.\nDefined by the high and low subscripts typically representing the vhdl type\n`ufixed(high downto low)`.\nThe binary point is located `low` places from the least significant digit.\nFor exxample:\n```toml\nufixed.high = 11\nufixed.low  = -4\n```\nequates to:\n``` vhdl\nufixed(11 downto -4)\n```\nand results in the binary fixed point form 000000000000.0000 with a resolution of\n2^{-4}, a maximum value of (2^16 - 1) / (2^4), and a minimum value of 0.",
+                    "type": "object",
+                    "properties": {
+                        "ufixed": {
+                            "type": "object",
+                            "properties": {
+                                "high": {
+                                    "type": "integer",
+                                    "format": "int32"
+                                },
+                                "low": {
+                                    "type": "integer",
+                                    "format": "int32"
+                                }
+                            },
+                            "required": [
+                                "high",
+                                "low"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "ufixed"
+                    ],
+                    "additionalProperties": false
+                },
+                {
+                    "description": "Signed fixed point numeric type.\nDefined by the high and low subscripts typically representing the vhdl type\n`sfixed(high downto low)`.\nThe binary point is located `low` places from the least significant digit.\nFor exxample:\n```toml\nsfixed.high = 11\nsfixed.low  = -4\n```\nequates to:\n``` vhdl\nsfixed(11 downto -4)\n```\nand results in the binary fixed point form 000000000000.0000 with a resolution of\n2^{-4}, a maximum value of (2^{16-1} - 1) / (2^4), and a minimum value of\n-(2^{16-1}) / (2^4).",
+                    "type": "object",
+                    "properties": {
+                        "sfixed": {
+                            "type": "object",
+                            "properties": {
+                                "high": {
+                                    "type": "integer",
+                                    "format": "int32"
+                                },
+                                "low": {
+                                    "type": "integer",
+                                    "format": "int32"
+                                }
+                            },
+                            "required": [
+                                "high",
+                                "low"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "sfixed"
+                    ],
+                    "additionalProperties": false
+                },
+                {
+                    "description": "String type; value is the length of the string in bytes.",
+                    "type": "object",
+                    "properties": {
+                        "string": {
+                            "type": "integer",
+                            "format": "uint32",
+                            "minimum": 0
+                        }
+                    },
+                    "required": [
+                        "string"
+                    ],
+                    "additionalProperties": false
+                }
+            ]
+        },
+        "Value": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "integer",
+                    "format": "uint64",
+                    "minimum": 0
+                },
+                {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                {
+                    "type": "number",
+                    "format": "double"
+                }
+            ]
+        }
+    }
+}
