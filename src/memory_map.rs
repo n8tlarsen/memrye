@@ -54,13 +54,6 @@ pub enum Composite {
     },
 }
 
-#[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
-#[serde(untagged)]
-pub enum OneOrMoreComposites {
-    One(Composite),
-    More(Vec<Composite>),
-}
-
 fn hex_str_or_unsigned<'de, D>(deserializer: D) -> Result<u64, D::Error>
 where
     D: Deserializer<'de>,

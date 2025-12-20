@@ -1,24 +1,27 @@
-use super::OneOrMoreComposites;
 use super::{Composite, Protocol};
 use schemars::schema_for;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::ser::PrettyFormatter;
+use serde_with::{formats::PreferOne, serde_as, OneOrMany};
 use std::io::Write;
 
+#[serde_as]
 #[derive(Deserialize, Serialize, JsonSchema)]
 pub struct MemoryMap {
     #[serde(flatten)]
     protocol: Protocol,
     #[serde(rename = "@map")]
-    map: OneOrMoreComposites,
+    #[serde_as(as = "OneOrMany<_,PreferOne>")]
+    map: Vec<Composite>,
     #[serde(rename = "@def")]
-    def: Option<OneOrMoreComposites>,
+    #[serde(default)]
+    #[serde_as(as = "OneOrMany<_,PreferOne>")]
+    def: Vec<Composite>,
 }
 
 impl MemoryMap {
-    pub fn elaborate(&mut self) -> Result<(), anyhow::Error> {
-        // self.field.elaborate(&self.protocol)
+    pub fn resolve(&mut self) -> Result<(), anyhow::Error> {
         Ok(())
     }
 
@@ -26,13 +29,6 @@ impl MemoryMap {
         // self.render_recursive()
         "".to_string()
     }
-
-    // fn render_recursive(&self) -> String {
-    //     if let FieldType::Set = &self.field_type {
-    //     } else {
-    //     }
-    //     "".to_string()
-    // }
 
     pub fn render_to_writer<W, E>(&self, writer: W) -> Result<(), E>
     where
