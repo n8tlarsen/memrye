@@ -5,16 +5,9 @@ use log::error;
 use schemars::JsonSchema;
 use serde::de::Error;
 use serde::{Deserialize, Serialize};
+use serde_with::{formats::PreferOne, serde_as, OneOrMany};
 
-#[derive(Deserialize, Serialize, JsonSchema, Default, Debug, Clone)]
-#[serde(untagged)]
-pub enum FieldOption {
-    #[default]
-    Reserved,
-    One(Field),
-    More(Vec<Field>),
-}
-
+#[serde_as]
 #[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
 pub struct Entry {
     name: String,
@@ -23,5 +16,9 @@ pub struct Entry {
     address: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     access: Option<Access>,
-    fields: FieldOption,
+    /// Length of the entry in bytes
+    bytes: u32,
+    #[serde(default)]
+    #[serde_as(as = "OneOrMany<_,PreferOne>")]
+    fields: Vec<Field>,
 }
