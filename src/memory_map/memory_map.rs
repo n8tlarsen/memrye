@@ -1,9 +1,9 @@
 use super::{Composite, Protocol};
 use schemars::schema_for;
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use serde::{de::Error, Deserialize, Deserializer, Serialize};
 use serde_json::ser::PrettyFormatter;
-use serde_with::{formats::PreferOne, serde_as, OneOrMany};
+use serde_with::{formats::PreferOne, serde_as, DefaultOnNull, DeserializeAs, OneOrMany};
 use std::io::Write;
 
 #[serde_as]
@@ -11,12 +11,12 @@ use std::io::Write;
 pub struct MemoryMap {
     #[serde(flatten)]
     protocol: Protocol,
-    #[serde(rename = "@map")]
+    #[serde(rename = "&map")]
     #[serde_as(as = "OneOrMany<_,PreferOne>")]
     map: Vec<Composite>,
-    #[serde(rename = "@def")]
+    #[serde(rename = "&def")]
     #[serde(default)]
-    #[serde_as(as = "OneOrMany<_,PreferOne>")]
+    #[serde_as(as = "DefaultOnNull<OneOrMany<_,PreferOne>>")]
     def: Vec<Composite>,
 }
 

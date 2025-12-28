@@ -1,54 +1,53 @@
 {
-    "protocol": {
-        "name": "Example Protocol",
-        "addressMax": "0xFFFF_FFFF",
-        "addressUnit": 1,
-        "addressAlign": 4
-    },
-    "name": "Example Memory Map",
-    "type": "set",
-    "contains": {
-        "name": "A nice group",
-        "address": "0x0000",
-        "access": "r",
-        "type": "set",
-        "contains": [
+    "name": "Example Protocol",
+    "addressMax": "0xFFFF_FFFF",
+    "addressUnit": 1,
+    "addressAlign": 4,
+    "@map" : {
+        "name": "Example Cluster",
+        "elements": [
             {
                 "name": "Description String",
-                "type": {
-                    "string": 20
-                },
-                "value": "My Great Memory Map"
+                "bytes": 20,
+                "fields" : {
+                    "name": "title",
+                    "type": {"string": 20},
+                    "value": "My Great Memory Map"
+                }
             },
             {
                 "name": "A bitfield",
                 "access": "rw",
-                "type": {
-                    "bitfield": {
-                        "length": 16,
-                        "bits": {
-                            "zero": 0,
-                            "one" : 1,
-                            "two" : 2,
-                            "ten" : 10
-                        }
-                    }
-                }
+                "bytes": 2,
+                "fields": [
+                    {"name": "zero", "type": "bit"},
+                    {"name": "one",  "type": "bit"},
+                    {"name": "two",  "type": "bit"},
+                    {"name": "ten",  "type": "bit", "offset":10}
+                ]
             },
             {
                 "name": "Another bitfield",
                 "access": "rw",
-                "type": {
-                    "bitfield": {
-                        "length": 8,
-                        "bits": [
-                            "item0",
-                            "item1",
-                            "item2",
-                            "item3"
-                        ]
-                    }
-                }
+                "bytes": 2,
+                "fields" : [
+                    {"name": "enum0", "type": {"enum": {"length": 3, "map": {
+                        "zero":  0,
+                        "one":   1,
+                        "two":   2,
+                        "three": 3,
+                        "four":  4,
+                        "five":  5,
+                        "six":   6,
+                        "seven": 7
+                    }}}},
+                    {"name": "item0", "type": "bit"},
+                    {"name": "item1", "type": "bit"},
+                    {"name": "item2", "type": "bit"},
+                    {"name": "item3", "type": "bit"},
+                    {"name": "item4", "type": "bit"},
+                    {"name": "number", "type": {"unsigned": 8}}
+                ]
             }
         ]
     }

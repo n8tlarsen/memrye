@@ -5,7 +5,7 @@ use log::{error, info};
 use schemars::JsonSchema;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 #[derive(Deserialize, Serialize, JsonSchema, Display, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
@@ -19,7 +19,7 @@ pub enum FieldType {
     #[display("std_logic_vector({} downto 0)", length-1)]
     Enum {
         length: u32,
-        map: HashMap<String, u64>,
+        map: BTreeMap<String, u64>,
     },
     /// Unsigned numeric type; value is length of the field in bits.
     /// Defined by length and representing the vhdl type `signed(length-1 downto 0)`.
@@ -111,7 +111,7 @@ pub struct Field {
     #[serde(skip_serializing_if = "Option::is_none")]
     access: Option<Access>,
     /// Field type
-    #[serde(rename = "type")]
+    #[serde(flatten)]
     field_type: FieldType,
     /// The default value of the field.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -128,15 +128,15 @@ pub struct Field {
 }
 
 impl Field {
-    pub fn length(&self) -> u64 {
+    pub fn length(&self) -> u32 {
         match self.field_type {
             FieldType::Bit => 1,
-            FieldType::Enum { length, .. } => length as u64,
-            FieldType::Unsigned(length) => length as u64,
-            FieldType::Signed(length) => length as u64,
-            FieldType::UFixed { high, low } => (high - low + 1) as u64,
-            FieldType::SFixed { high, low } => (high - low + 1) as u64,
-            FieldType::String(length) => (length as u64) * 8u64,
+            FieldType::Enum { length, .. } => length,
+            FieldType::Unsigned(length) => length,
+            FieldType::Signed(length) => length,
+            FieldType::UFixed { high, low } => (high - low + 1) as u32,
+            FieldType::SFixed { high, low } => (high - low + 1) as u32,
+            FieldType::String(length) => length * 8u32,
         }
     }
 
@@ -205,7 +205,7 @@ impl Field {
     fn resolve_field_type_enum(
         &self,
         length: &u32,
-        map: &HashMap<String, u64>,
+        map: &BTreeMap<String, u64>,
     ) -> Result<Option<Value>, anyhow::Error> {
         if let Some(value) = &self.value {
             match value {
@@ -250,8 +250,8 @@ impl Field {
                 }
             }
         } else {
-            // Default to the minimum enum in the HashMap
-            // Unwrap should never fail here since serde has already validated the HashMap
+            // Default to the minimum enum in the map
+            // Unwrap should never fail here since serde has already validated the map
             let (min_key, _min_value) = map.iter().min_by_key(|(_, value)| **value).unwrap();
             Ok(Some(Value::String((*min_key).clone())))
         }

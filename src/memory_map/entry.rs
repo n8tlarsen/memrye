@@ -5,7 +5,7 @@ use log::error;
 use schemars::JsonSchema;
 use serde::de::Error;
 use serde::{Deserialize, Serialize};
-use serde_with::{formats::PreferOne, serde_as, OneOrMany};
+use serde_with::{formats::PreferOne, serde_as, DefaultOnNull, OneOrMany};
 
 #[serde_as]
 #[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
@@ -19,6 +19,6 @@ pub struct Entry {
     /// Length of the entry in bytes
     bytes: u32,
     #[serde(default)]
-    #[serde_as(as = "OneOrMany<_,PreferOne>")]
+    #[serde_as(as = "DefaultOnNull<OneOrMany<_,PreferOne>>")]
     fields: Vec<Field>,
 }
