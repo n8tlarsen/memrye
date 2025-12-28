@@ -1,28 +1,28 @@
-pub mod array;
-pub mod cluster;
-pub mod entry;
+pub mod composite;
 pub mod field;
-pub mod memory_map;
 pub mod protocol;
+pub mod resolved;
 // pub mod reference;
 
-pub use array::Array;
-pub use cluster::Cluster;
-// pub use composite::Composite;
-pub use entry::Entry;
+pub use composite::{Array, Cluster, Composite, Entry};
 pub use field::Field;
-pub use memory_map::MemoryMap;
 pub use protocol::Protocol;
 
 use derive_more::Display;
+use schemars::schema_for;
 use schemars::JsonSchema;
 #[cfg(test)]
 use serde::de::value::{Error as ValueError, I64Deserializer, StrDeserializer};
 #[cfg(test)]
 use serde::de::IntoDeserializer;
-use serde::de::{Unexpected, Visitor};
+use serde::de::{Error, MapAccess, Unexpected, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
+use serde_json::ser::PrettyFormatter;
+use serde_with::{formats::PreferOne, serde_as, DefaultOnNull, OneOrMany};
+use std::collections::BTreeMap;
 use std::fmt;
+use std::io::Write;
+use std::marker::PhantomData;
 
 #[derive(Deserialize, Serialize, JsonSchema, Display, Default, Debug, Copy, Clone)]
 pub enum Access {
@@ -41,17 +41,46 @@ pub enum Access {
     ReadWrite,
 }
 
-#[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
-#[serde(untagged)]
-pub enum Composite {
-    Array(Array),
-    Cluster(Cluster),
-    Entry(Entry),
-    Reference {
-        #[serde(rename = "@ref")]
-        #[garde(pattern(r"[-_ A-Za-z0-9\/]*"))]
-        reference: String,
-    },
+#[serde_as]
+#[derive(Deserialize, Serialize, JsonSchema)]
+pub struct MemoryMap {
+    #[serde(flatten)]
+    protocol: Protocol,
+    #[serde(rename = "&map")]
+    #[serde_as(as = "OneOrMany<_,PreferOne>")]
+    map: Vec<Composite>,
+    #[serde(rename = "&def")]
+    #[serde(default)]
+    #[serde_as(as = "DefaultOnNull<OneOrMany<_,PreferOne>>")]
+    def: Vec<Composite>,
+}
+
+impl MemoryMap {
+    pub fn resolve(&mut self) -> Result<(), anyhow::Error> {
+        Ok(())
+    }
+
+    pub fn render(&self) -> String {
+        // self.render_recursive()
+        "".to_string()
+    }
+
+    pub fn render_to_writer<W, E>(&self, writer: W) -> Result<(), E>
+    where
+        W: Write,
+        E: std::error::Error,
+    {
+        Result::Ok(())
+    }
+}
+
+pub fn get_memory_map_schema() -> String {
+    let schema = schema_for!(MemoryMap);
+    let formatter = PrettyFormatter::with_indent(b"    ");
+    let mut buf = Vec::new();
+    let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+    serde::Serialize::serialize(&schema, &mut ser).expect("Failed to serialize schema");
+    String::from_utf8(buf).expect("Failed to convert serial buffer to string")
 }
 
 fn hex_str_or_unsigned<'de, D>(deserializer: D) -> Result<u64, D::Error>
