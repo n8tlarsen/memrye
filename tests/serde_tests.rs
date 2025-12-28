@@ -63,13 +63,58 @@ pub fn mm_entry_all() {
                 {"name": "Test Enum", "enum": {
                     "length": 4,
                     "map" : {
-                        "zero":  0,
-                        "one":   1,
-                        "two":   2,
-                        "three": 3
+                        "0": "zero",
+                        "1": "one",
+                        "2": "two",
+                        "3": "three"
                     }
                 }}
             ]
+        }
+    })
+    .to_string();
+    let memory_map: MemoryMap = serde_json::from_str(&content).expect("Failed to parse JSON");
+    println!(
+        "Minimal Entry:\n{}\n",
+        serde_json::to_string_pretty(&memory_map).expect("Failed to serialize to JSON string")
+    )
+}
+
+#[test]
+pub fn mm_array_all() {
+    let content = json!({
+        "addressMax": "0xFFFF_FFFF",
+        "addressUnit": 1,
+        "addressAlign": 4,
+        "&map" : {
+            "name": "Test Array",
+            "address": "0x0000_1000",
+            "access": "r",
+            "elements": {
+                "name": "Test Entry",
+                "address": "0x0000_1000",
+                "access": "r",
+                "bytes": 1,
+                "fields": [
+                    {"name": "Test Field", "unsigned": 4},
+                    {"name": "Test Enum", "enum": {
+                        "length": 4,
+                        "map" : {
+                            "0": "zero",
+                            "1": "one",
+                            "2": "two",
+                            "3": "three"
+                        }
+                    }}
+                ]
+            },
+            "increment": 4,
+            "indexEnums": {
+                "0": "zero",
+                "1": "one",
+                "2": "two",
+                "3": "three"
+            }
         }
     })
     .to_string();

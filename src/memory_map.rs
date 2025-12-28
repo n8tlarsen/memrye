@@ -15,14 +15,14 @@ use schemars::JsonSchema;
 use serde::de::value::{Error as ValueError, I64Deserializer, StrDeserializer};
 #[cfg(test)]
 use serde::de::IntoDeserializer;
-use serde::de::{Error, MapAccess, Unexpected, Visitor};
+use serde::de::{Unexpected, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::ser::PrettyFormatter;
+use serde_with::DisplayFromStr;
 use serde_with::{formats::PreferOne, serde_as, DefaultOnNull, OneOrMany};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::io::Write;
-use std::marker::PhantomData;
 
 #[derive(Deserialize, Serialize, JsonSchema, Display, Default, Debug, Copy, Clone)]
 pub enum Access {
@@ -82,6 +82,10 @@ pub fn get_memory_map_schema() -> String {
     serde::Serialize::serialize(&schema, &mut ser).expect("Failed to serialize schema");
     String::from_utf8(buf).expect("Failed to convert serial buffer to string")
 }
+
+#[serde_as]
+#[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
+pub struct EnumMap(#[serde_as(as = "BTreeMap<DisplayFromStr, _>")] BTreeMap<u64, String>);
 
 fn hex_str_or_unsigned<'de, D>(deserializer: D) -> Result<u64, D::Error>
 where

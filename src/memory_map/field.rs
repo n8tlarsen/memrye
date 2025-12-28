@@ -1,11 +1,10 @@
-use crate::memory_map::{maybe_hex_str_or_unsigned, Access};
+use crate::memory_map::{maybe_hex_str_or_unsigned, Access, EnumMap};
 use anyhow::anyhow;
 use derive_more::Display;
 use log::{error, info};
 use schemars::JsonSchema;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize};
-use std::collections::BTreeMap;
 
 #[derive(Deserialize, Serialize, JsonSchema, Display, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
@@ -17,10 +16,7 @@ pub enum FieldType {
     /// Enumerated type
     /// Represented by the vhdl type `std_logic_vector(length-1 downto 0)`
     #[display("std_logic_vector({} downto 0)", length-1)]
-    Enum {
-        length: u32,
-        map: BTreeMap<String, u64>,
-    },
+    Enum { length: u32, map: EnumMap },
     /// Unsigned numeric type; value is length of the field in bits.
     /// Defined by length and representing the vhdl type `signed(length-1 downto 0)`.
     #[display("unsigned({} downto 0)", _0-1)]
@@ -205,7 +201,7 @@ impl Field {
     fn resolve_field_type_enum(
         &self,
         length: &u32,
-        map: &BTreeMap<String, u64>,
+        map: &EnumMap,
     ) -> Result<Option<Value>, anyhow::Error> {
         if let Some(value) = &self.value {
             match value {
@@ -218,7 +214,7 @@ impl Field {
                         error!("{}", error);
                         return Err(error);
                     }
-                    if !(map.values().any(|&x| x == *number)) {
+                    if !(map.0.contains_key(number)) {
                         let error = anyhow!(format!(
                                 "Numeric value {} is not a value specified by the enum field type of field {}",
                                 *number, self.name
@@ -229,7 +225,7 @@ impl Field {
                     Ok(None)
                 }
                 Value::String(string) => {
-                    if !(map.contains_key(string)) {
+                    if !(map.0.values().any(|x| *x == *string)) {
                         let error = anyhow!(format!(
                                 "String value {} is not a key specified by the enum field type of field {}",
                                 *string, self.name
@@ -251,9 +247,11 @@ impl Field {
             }
         } else {
             // Default to the minimum enum in the map
-            // Unwrap should never fail here since serde has already validated the map
-            let (min_key, _min_value) = map.iter().min_by_key(|(_, value)| **value).unwrap();
-            Ok(Some(Value::String((*min_key).clone())))
+            if let Some((_min_key, min_value)) = map.0.first_key_value() {
+                Ok(Some(Value::String(min_value.clone())))
+            } else {
+                Ok(Some(Value::String(String::default())))
+            }
         }
     }
 

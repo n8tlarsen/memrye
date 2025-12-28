@@ -1,8 +1,7 @@
-use crate::memory_map::{maybe_hex_str_or_unsigned, Access, Field};
+use crate::memory_map::{maybe_hex_str_or_unsigned, Access, EnumMap, Field};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::{formats::PreferOne, serde_as, DefaultOnNull, OneOrMany};
-use std::collections::BTreeMap;
 
 #[serde_as]
 #[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
@@ -18,7 +17,7 @@ pub struct Array {
     elements: Vec<Composite>,
     #[serde(default, deserialize_with = "maybe_hex_str_or_unsigned")]
     increment: Option<u64>,
-    index_enums: Option<BTreeMap<String, u64>>,
+    index_enums: Option<EnumMap>,
 }
 
 #[serde_as]
