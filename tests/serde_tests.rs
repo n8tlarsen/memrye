@@ -108,13 +108,8 @@ pub fn mm_array_all() {
                     }}
                 ]
             },
-            "increment": 4,
-            "indexEnums": {
-                "0": "zero",
-                "1": "one",
-                "2": "two",
-                "3": "three"
-            }
+            "index": [1,2,null,null,5,6],
+            "increment": 4
         }
     })
     .to_string();
