@@ -1,6 +1,6 @@
 use crate::memory_map::{maybe_hex_str_or_unsigned, Access, Field};
 use schemars::JsonSchema;
-use schemars::{Schema, SchemaGenerator};
+use schemars::{json_schema, Schema, SchemaGenerator};
 use serde::de::Visitor;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::schemars_1::JsonSchemaAs;
@@ -10,9 +10,9 @@ use serde_with::{
 use std::borrow::Cow;
 use std::fmt;
 
-struct NumberOrString;
+struct IntegerOrString;
 
-impl SerializeAs<String> for NumberOrString {
+impl SerializeAs<String> for IntegerOrString {
     fn serialize_as<S>(source: &String, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -21,7 +21,7 @@ impl SerializeAs<String> for NumberOrString {
     }
 }
 
-impl<'de> DeserializeAs<'de, String> for NumberOrString {
+impl<'de> DeserializeAs<'de, String> for IntegerOrString {
     fn deserialize_as<D>(deserializer: D) -> Result<String, D::Error>
     where
         D: Deserializer<'de>,
@@ -30,20 +30,13 @@ impl<'de> DeserializeAs<'de, String> for NumberOrString {
         where
             D: Deserializer<'de>,
         {
-            struct NumberOrStringVisitor;
+            struct IntegerOrStringVisitor;
 
-            impl Visitor<'_> for NumberOrStringVisitor {
+            impl Visitor<'_> for IntegerOrStringVisitor {
                 type Value = String;
 
                 fn expecting(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-                    fmt.write_str("string or integer")
-                }
-
-                fn visit_i64<E>(self, val: i64) -> Result<Self::Value, E>
-                where
-                    E: serde::de::Error,
-                {
-                    Ok(val.to_string())
+                    fmt.write_str("integer or string")
                 }
 
                 fn visit_u64<E>(self, val: u64) -> Result<Self::Value, E>
@@ -61,25 +54,28 @@ impl<'de> DeserializeAs<'de, String> for NumberOrString {
                 }
             }
 
-            deserializer.deserialize_any(NumberOrStringVisitor)
+            deserializer.deserialize_any(IntegerOrStringVisitor)
         }
 
         deserialize(deserializer)
     }
 }
 
-impl JsonSchemaAs<String> for NumberOrString {
+impl JsonSchemaAs<String> for IntegerOrString {
     fn schema_name() -> Cow<'static, str> {
-        <String as JsonSchema>::schema_name()
+        "IntegerOrString".into()
     }
     fn schema_id() -> Cow<'static, str> {
-        <String as JsonSchema>::schema_id()
+        "IntegerOrString".into()
     }
-    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
-        <String as JsonSchema>::json_schema(generator)
+    fn json_schema(_: &mut SchemaGenerator) -> Schema {
+        json_schema!({
+            "type": ["integer", "string"],
+            "format": ["uint64", "int64"],
+        })
     }
     fn inline_schema() -> bool {
-        <String as JsonSchema>::inline_schema()
+        true
     }
 }
 
@@ -88,14 +84,8 @@ impl JsonSchemaAs<String> for NumberOrString {
 #[serde(untagged)]
 pub enum Index {
     Length(u64),
-    Range {
-        high: u64,
-        low: u64,
-    },
-    List(
-        #[serde_as(as = "OneOrMany<DefaultOnNull<Option<NumberOrString>>, PreferOne>")]
-        Vec<Option<String>>,
-    ),
+    Range { high: u64, low: u64 },
+    List(#[serde_as(as = "OneOrMany<Option<IntegerOrString>, PreferOne>")] Vec<Option<String>>),
 }
 
 #[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
