@@ -3,7 +3,6 @@ pub mod field;
 pub mod protocol;
 pub mod resolved;
 pub mod serde_helpers;
-// pub mod reference;
 
 pub use composite::{Array, Cluster, Composite, Entry};
 pub use field::Field;
@@ -16,7 +15,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::ser::PrettyFormatter;
 use serde_with::{formats::PreferOne, serde_as, DefaultOnNull, OneOrMany};
-use std::io::Write;
 
 #[derive(Deserialize, Serialize, JsonSchema, Display, Default, Debug, Copy, Clone)]
 pub enum Access {
@@ -47,25 +45,6 @@ pub struct MemoryMap {
     #[serde(default)]
     #[serde_as(as = "DefaultOnNull<OneOrMany<_,PreferOne>>")]
     def: Vec<Composite>,
-}
-
-impl MemoryMap {
-    pub fn resolve(&mut self) -> Result<(), anyhow::Error> {
-        Ok(())
-    }
-
-    pub fn render(&self) -> String {
-        // self.render_recursive()
-        "".to_string()
-    }
-
-    pub fn render_to_writer<W, E>(&self, writer: W) -> Result<(), E>
-    where
-        W: Write,
-        E: std::error::Error,
-    {
-        Result::Ok(())
-    }
 }
 
 pub fn get_memory_map_schema() -> String {

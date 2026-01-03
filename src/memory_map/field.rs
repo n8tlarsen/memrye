@@ -16,7 +16,7 @@ pub enum FieldType {
     Bit,
     /// Enumerated type
     /// Represented by the vhdl type `std_logic_vector(length-1 downto 0)`
-    #[display("std_logic_vector({} downto 0)", length-1)]
+    #[display("std_logic_vector({} downto 0):<br>{}", length-1, map)]
     Enum { length: u32, map: EnumMap },
     /// Unsigned numeric type; value is length of the field in bits.
     /// Defined by length and representing the vhdl type `signed(length-1 downto 0)`.

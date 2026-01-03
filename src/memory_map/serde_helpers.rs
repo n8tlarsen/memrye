@@ -167,3 +167,32 @@ impl JsonSchemaAs<u64> for HexStrOrUnsigned {
 #[serde_as]
 #[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
 pub struct EnumMap(#[serde_as(as = "BTreeMap<DisplayFromStr, _>")] pub BTreeMap<u64, String>);
+
+impl fmt::Display for EnumMap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some((&max_key, _)) = self.0.last_key_value() {
+            match max_key {
+                0..2 => {
+                    for (key, value) in self.0.iter() {
+                        write!(f, "0b{key:b}: {value}<br>")?;
+                    }
+                    return Ok(());
+                }
+                2..16 => {
+                    for (key, value) in self.0.iter() {
+                        write!(f, "0x{key:X}: {value}<br>")?;
+                    }
+                    return Ok(());
+                }
+                _ => {
+                    let width = (max_key as f64).log(16f64).ceil() as usize;
+                    for (key, value) in self.0.iter() {
+                        write!(f, "0x{key:0width$X}: {value}<br>", width = width)?;
+                    }
+                    return Ok(());
+                }
+            }
+        }
+        Ok(())
+    }
+}
