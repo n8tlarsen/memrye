@@ -1,7 +1,9 @@
-use super::hex_str_or_unsigned;
+use crate::memory_map::HexStrOrUnsigned;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 
+#[serde_as]
 #[derive(Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Protocol {
@@ -9,7 +11,7 @@ pub struct Protocol {
     pub name: Option<String>,
     /// Maximum address in terms of addressUnit.
     /// Accepts '0x' prefixed hex strings with underscores allowed between digits to enhance readability
-    #[serde(deserialize_with = "hex_str_or_unsigned")]
+    #[serde_as(as = "HexStrOrUnsigned")]
     pub address_max: u64,
     /// Number of bytes accessed with one address
     pub address_unit: u64,

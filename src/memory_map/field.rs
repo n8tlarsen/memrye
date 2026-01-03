@@ -1,10 +1,11 @@
-use crate::memory_map::{maybe_hex_str_or_unsigned, Access, EnumMap};
+use crate::memory_map::{Access, EnumMap, HexStrOrUnsigned};
 use anyhow::anyhow;
 use derive_more::Display;
 use log::{error, info};
 use schemars::JsonSchema;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize};
+use serde_with::serde_as;
 
 #[derive(Deserialize, Serialize, JsonSchema, Display, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
@@ -91,6 +92,7 @@ pub enum Value {
     Float(f64),
 }
 
+#[serde_as]
 #[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
 pub struct Field {
     name: String,
@@ -99,7 +101,7 @@ pub struct Field {
     /// previously defined field. If no prior field exists, elaboration assumes the field exists
     /// at offset zero.
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default, deserialize_with = "maybe_hex_str_or_unsigned")]
+    #[serde_as(as = "Option<HexStrOrUnsigned>")]
     offset: Option<u64>,
     /// Field accessibility.
     /// If no accessibility is specified, elaboration assumes the field inherits
