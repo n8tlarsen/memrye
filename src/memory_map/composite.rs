@@ -5,6 +5,7 @@ use serde_with::{formats::PreferOne, serde_as, DefaultOnNull, OneOrMany};
 
 #[serde_as]
 #[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
+#[cfg_attr(test, derive(PartialEq))]
 #[serde(untagged)]
 pub enum Index {
     Length(u64),
@@ -14,6 +15,7 @@ pub enum Index {
 
 #[serde_as]
 #[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
+#[cfg_attr(test, derive(PartialEq))]
 #[serde(rename_all = "camelCase")]
 pub struct Array {
     name: String,
@@ -31,6 +33,7 @@ pub struct Array {
 
 #[serde_as]
 #[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct Cluster {
     name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -44,6 +47,7 @@ pub struct Cluster {
 
 #[serde_as]
 #[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct Entry {
     name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -59,6 +63,7 @@ pub struct Entry {
 }
 
 #[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
+#[cfg_attr(test, derive(PartialEq))]
 #[serde(untagged)]
 pub enum Composite {
     Array(Array),

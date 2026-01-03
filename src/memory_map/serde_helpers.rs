@@ -166,6 +166,7 @@ impl JsonSchemaAs<u64> for HexStrOrUnsigned {
 
 #[serde_as]
 #[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct EnumMap(#[serde_as(as = "BTreeMap<DisplayFromStr, _>")] pub BTreeMap<u64, String>);
 
 impl fmt::Display for EnumMap {

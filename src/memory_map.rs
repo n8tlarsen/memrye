@@ -17,6 +17,7 @@ use serde_json::ser::PrettyFormatter;
 use serde_with::{formats::PreferOne, serde_as, DefaultOnNull, OneOrMany};
 
 #[derive(Deserialize, Serialize, JsonSchema, Display, Default, Debug, Copy, Clone)]
+#[cfg_attr(test, derive(PartialEq))]
 pub enum Access {
     /// Read-only access is permitted
     #[default]
@@ -34,17 +35,18 @@ pub enum Access {
 }
 
 #[serde_as]
-#[derive(Deserialize, Serialize, JsonSchema)]
+#[derive(Deserialize, Serialize, JsonSchema, Debug)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct MemoryMap {
     #[serde(flatten)]
-    protocol: Protocol,
+    pub(crate) protocol: Protocol,
     #[serde(rename = "&map")]
     #[serde_as(as = "OneOrMany<_,PreferOne>")]
-    map: Vec<Composite>,
+    pub(crate) map: Vec<Composite>,
     #[serde(rename = "&def")]
     #[serde(default)]
     #[serde_as(as = "DefaultOnNull<OneOrMany<_,PreferOne>>")]
-    def: Vec<Composite>,
+    pub(crate) def: Vec<Composite>,
 }
 
 pub fn get_memory_map_schema() -> String {

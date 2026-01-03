@@ -8,6 +8,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_with::serde_as;
 
 #[derive(Deserialize, Serialize, JsonSchema, Display, Debug, Clone)]
+#[cfg_attr(test, derive(PartialEq))]
 #[serde(rename_all = "lowercase")]
 pub enum FieldType {
     /// Single bit field
@@ -82,6 +83,7 @@ where
 }
 
 #[derive(Deserialize, Serialize, JsonSchema, Display, Debug, Clone)]
+#[cfg_attr(test, derive(PartialEq))]
 #[serde(untagged)]
 pub enum Value {
     #[serde(deserialize_with = "ascii_only_string")]
@@ -94,6 +96,7 @@ pub enum Value {
 
 #[serde_as]
 #[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct Field {
     name: String,
     /// Bit offset from the beginning of the entry.
