@@ -1,16 +1,47 @@
 use serde_json::json;
+use std::collections::BTreeMap;
 use std::fs;
+use toml::toml;
+use vhdl_doc::memory_map::{EnumMap, HexStrOrUnsigned, IntegerOrString};
 use vhdl_doc::memory_map::{Field, MemoryMap};
 
-// #[test]
-// pub fn toml_to_json() {
-//     let contents = fs::read_to_string("tests/assets/memory_map.toml").expect("Failed to read file");
-//     let memory_map: MemoryMap = toml::from_str(&contents).expect("Failed to parse TOML");
-//     println!(
-//         "{}",
-//         serde_json::to_string_pretty(&memory_map).expect("Failed to serialize to JSON string")
-//     );
-// }
+#[test]
+pub fn enum_map_json() {
+    let content = json!({
+        "0": "zero",
+        "1": "one",
+        "2": "two",
+        "3": "three"
+    })
+    .to_string();
+    let map: EnumMap = serde_json::from_str(&content).expect("Failed to parse JSON");
+    let expected: EnumMap = EnumMap(BTreeMap::from([
+        (0u64, "zero".to_string()),
+        (1u64, "one".to_string()),
+        (2u64, "two".to_string()),
+        (3u64, "three".to_string()),
+    ]));
+    assert_eq!(map.0, expected.0);
+}
+
+#[test]
+pub fn enum_map_toml() {
+    let content = toml!(
+        0 = "zero"
+        1 = "one"
+        2 = "two"
+        3 = "three"
+    )
+    .to_string();
+    let map: EnumMap = toml::from_str(&content).expect("Failed to parse TOML");
+    let expected: EnumMap = EnumMap(BTreeMap::from([
+        (0u64, "zero".to_string()),
+        (1u64, "one".to_string()),
+        (2u64, "two".to_string()),
+        (3u64, "three".to_string()),
+    ]));
+    assert_eq!(map.0, expected.0);
+}
 
 #[test]
 pub fn mm_empty() {
@@ -119,26 +150,3 @@ pub fn mm_array_all() {
         serde_json::to_string_pretty(&memory_map).expect("Failed to serialize to JSON string")
     )
 }
-
-// #[test]
-// pub fn json_to_toml() {
-//     let contents = fs::read_to_string("tests/assets/memory_map.json").expect("Failed to read file");
-//     let memory_map: MemoryMap = serde_json::from_str(&contents).expect("Failed to parse JSON");
-// println!(
-//     "{}",
-//     toml::to_string_pretty(&memory_map).expect("Failed to serialize to TOML string")
-// );
-// }
-
-// #[test]
-// pub fn toml_eval() {
-//     let contents = fs::read_to_string("tests/assets/memory_map.json").expect("Failed to read file");
-//     let mut memory_map: MemoryMap = serde_json::from_str(&contents).expect("Failed to parse JSON");
-//     memory_map
-//         .elaborate()
-//         .expect("Failed to elaborate memory map for TOML document.");
-//     println!(
-//         "{}",
-//         serde_json::to_string_pretty(&memory_map).expect("Failed to serialize to JSON string")
-//     );
-// }
