@@ -7,6 +7,8 @@ use std::fmt;
 use std::io::Write;
 use tabled::Tabled;
 
+use super::{Composite, DisplayOption, MemoryMap};
+
 #[derive(Debug, Display, Clone)]
 pub enum LinkOrType {
     #[display("[{text}]({link})")]
@@ -55,24 +57,6 @@ pub struct ResolvedEntry {
     value: Value,
 }
 
-#[derive(Debug, Clone)]
-struct DisplayOption<T>(Option<T>)
-where
-    T: fmt::Display + Default;
-
-impl<T> fmt::Display for DisplayOption<T>
-where
-    T: fmt::Display + Default,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(ref value) = self.0 {
-            write!(f, "{}", value)
-        } else {
-            write!(f, "")
-        }
-    }
-}
-
 #[derive(Tabled, Debug, Clone)]
 #[tabled(rename_all = "Upper Title Case")]
 pub struct ResolvedField {
@@ -100,12 +84,31 @@ struct SectionTable<T> {
     table: Vec<T>,
 }
 
+impl<T> SectionTable<T> {
+    pub fn new(name: &str) -> Self {
+        SectionTable {
+            name: name.to_string(),
+            table: Vec::new(),
+        }
+    }
+
+    pub fn push(&mut self, value: T) {
+        self.table.push(value)
+    }
+}
+
+#[derive(Default)]
 pub struct ResolvedMemoryMap {
     entries: Vec<SectionTable<ResolvedEntry>>,
     fields: Vec<SectionTable<ResolvedField>>,
 }
 
 impl ResolvedMemoryMap {
+    pub fn new_entry_table(&mut self, name: &str) -> &mut SectionTable<ResolvedEntry> {
+        self.entries.push(SectionTable::new(name));
+        self.entries.last_mut().unwrap()
+    }
+
     pub fn render(&self) -> String {
         // self.render_recursive()
         "".to_string()
@@ -117,5 +120,19 @@ impl ResolvedMemoryMap {
         E: std::error::Error,
     {
         Result::Ok(())
+    }
+}
+
+impl From<MemoryMap> for ResolvedMemoryMap {
+    fn from(value: MemoryMap) -> Self {
+        let resolved = ResolvedMemoryMap::default();
+        let defs = ResolvedMemoryMap::default();
+        for def in value.def.iter() {
+            // if let Composite::Entry(entry) = def {
+            //     defs.
+            // } else {
+            // }
+        }
+        resolved
     }
 }

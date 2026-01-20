@@ -7,7 +7,7 @@ pub mod serde_helpers;
 pub use composite::{Array, Cluster, Composite, Entry};
 pub use field::Field;
 pub use protocol::Protocol;
-pub use serde_helpers::{EnumMap, HexStrOrUnsigned, IntegerOrString};
+pub use serde_helpers::{DisplayOption, EnumMap, HexStrOrUnsigned, IntegerOrString};
 
 use derive_more::Display;
 use schemars::schema_for;

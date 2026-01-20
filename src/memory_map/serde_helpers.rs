@@ -1,7 +1,9 @@
+use derive_more::Display;
 use schemars::{json_schema, JsonSchema, Schema, SchemaGenerator};
 use serde::de::{Unexpected, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::schemars_1::JsonSchemaAs;
+use serde_with::ser::SerializeAsWrap;
 use serde_with::{serde_as, DeserializeAs, DisplayFromStr, SerializeAs};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -76,6 +78,7 @@ impl JsonSchemaAs<String> for IntegerOrString {
     }
 }
 
+#[derive(Display, Default)]
 pub struct HexStrOrUnsigned;
 
 impl SerializeAs<u64> for HexStrOrUnsigned {
@@ -195,5 +198,87 @@ impl fmt::Display for EnumMap {
             }
         }
         Ok(())
+    }
+}
+
+#[derive(Default, Debug, Clone, Deserialize, Serialize)]
+#[cfg_attr(test, derive(PartialEq))]
+pub struct DisplayOption<T>(pub Option<T>)
+where
+    T: fmt::Display + Default;
+
+impl<T> DisplayOption<T>
+where
+    T: fmt::Display + Default,
+{
+    pub fn is_some(&self) -> bool {
+        self.0.is_some()
+    }
+    pub fn is_none(&self) -> bool {
+        self.0.is_none()
+    }
+}
+
+impl<T> fmt::Display for DisplayOption<T>
+where
+    T: fmt::Display + Default,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(ref value) = self.0 {
+            write!(f, "{}", value)
+        } else {
+            write!(f, "")
+        }
+    }
+}
+
+impl<'de, T, U> DeserializeAs<'de, DisplayOption<T>> for Option<U>
+where
+    T: fmt::Display + Default,
+    U: DeserializeAs<'de, T> + fmt::Display + Default,
+{
+    fn deserialize_as<D>(deserializer: D) -> Result<DisplayOption<T>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match Option::<U>::deserialize_as(deserializer) {
+            Ok(value) => Ok(DisplayOption(value)),
+            Err(error) => panic!("{}", error),
+        }
+    }
+}
+
+impl<T, U> SerializeAs<DisplayOption<T>> for Option<U>
+where
+    T: fmt::Display + Default,
+    U: SerializeAs<T> + fmt::Display + Default,
+{
+    fn serialize_as<S>(source: &DisplayOption<T>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match source.0 {
+            Some(ref value) => serializer.serialize_some(&SerializeAsWrap::<T, U>::new(value)),
+            None => serializer.serialize_none(),
+        }
+    }
+}
+
+impl<T, TA> JsonSchemaAs<DisplayOption<T>> for Option<TA>
+where
+    T: fmt::Display + Default + schemars::JsonSchema,
+    TA: fmt::Display + Default,
+{
+    fn schema_name() -> Cow<'static, str> {
+        <Option<T> as JsonSchema>::schema_name()
+    }
+    fn schema_id() -> Cow<'static, str> {
+        <Option<T> as JsonSchema>::schema_id()
+    }
+    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+        <Option<T> as JsonSchema>::json_schema(generator)
+    }
+    fn inline_schema() -> bool {
+        <Option<T> as JsonSchema>::inline_schema()
     }
 }

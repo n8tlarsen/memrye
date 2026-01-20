@@ -1,9 +1,8 @@
 use serde_json::json;
 use std::collections::BTreeMap;
-use std::fs;
 use toml::toml;
+use vhdl_doc::memory_map::{DisplayOption, Field, MemoryMap};
 use vhdl_doc::memory_map::{EnumMap, HexStrOrUnsigned, IntegerOrString};
-use vhdl_doc::memory_map::{Field, MemoryMap};
 
 #[test]
 pub fn enum_map_json() {
@@ -90,8 +89,8 @@ pub fn mm_entry_all() {
             "access": "r",
             "bytes": 1,
             "fields": [
-                {"name": "Test Field", "unsigned": 4},
-                {"name": "Test Enum", "enum": {
+                {"name": "Test Field", "offset": 0, "unsigned": 4},
+                {"name": "Test Enum", "offset": 4, "enum": {
                     "length": 4,
                     "map" : {
                         "0": "zero",

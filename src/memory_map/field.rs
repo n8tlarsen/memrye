@@ -1,4 +1,4 @@
-use crate::memory_map::{Access, EnumMap, HexStrOrUnsigned};
+use crate::memory_map::{Access, DisplayOption, EnumMap, HexStrOrUnsigned};
 use anyhow::anyhow;
 use derive_more::Display;
 use log::{error, info};
@@ -103,9 +103,10 @@ pub struct Field {
     /// If no offset is provided, elaboration assumes the field is packed directly following the
     /// previously defined field. If no prior field exists, elaboration assumes the field exists
     /// at offset zero.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[serde(skip_serializing_if = "DisplayOption::is_none")]
     #[serde_as(as = "Option<HexStrOrUnsigned>")]
-    offset: Option<u64>,
+    offset: DisplayOption<u64>,
     /// Field accessibility.
     /// If no accessibility is specified, elaboration assumes the field inherits
     /// access from its parent context
@@ -142,12 +143,12 @@ impl Field {
     }
 
     pub fn get_offset(&self) -> Option<u64> {
-        self.offset
+        self.offset.0
     }
 
     pub fn set_offset(&mut self, value: u64) -> Result<(), anyhow::Error> {
-        if self.offset.is_none() {
-            self.offset = Some(value);
+        if self.offset.0.is_none() {
+            self.offset.0 = Some(value);
             Ok(())
         } else {
             let error = anyhow!("Internal error. Attempted to overwrite provided field \"offset\"");
