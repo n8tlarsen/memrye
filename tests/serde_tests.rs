@@ -1,8 +1,7 @@
 use serde_json::json;
 use std::collections::BTreeMap;
 use toml::toml;
-use vhdl_doc::memory_map::{DisplayOption, Field, MemoryMap};
-use vhdl_doc::memory_map::{EnumMap, HexStrOrUnsigned, IntegerOrString};
+use vhdl_doc::memory_map::{EnumMap, MemoryMap};
 
 #[test]
 pub fn enum_map_json() {

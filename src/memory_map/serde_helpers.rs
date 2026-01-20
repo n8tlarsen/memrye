@@ -232,33 +232,57 @@ where
     }
 }
 
-impl<'de, T, U> DeserializeAs<'de, DisplayOption<T>> for Option<U>
+impl<'de, T> DeserializeAs<'de, DisplayOption<T>> for Option<T>
 where
-    T: fmt::Display + Default,
-    U: DeserializeAs<'de, T> + fmt::Display + Default,
+    T: Deserialize<'de> + fmt::Display + Default,
 {
     fn deserialize_as<D>(deserializer: D) -> Result<DisplayOption<T>, D::Error>
     where
         D: Deserializer<'de>,
     {
-        match Option::<U>::deserialize_as(deserializer) {
+        match Option::<T>::deserialize(deserializer) {
             Ok(value) => Ok(DisplayOption(value)),
             Err(error) => panic!("{}", error),
         }
     }
 }
 
-impl<T, U> SerializeAs<DisplayOption<T>> for Option<U>
+impl<'de> DeserializeAs<'de, DisplayOption<u64>> for Option<HexStrOrUnsigned> {
+    fn deserialize_as<D>(deserializer: D) -> Result<DisplayOption<u64>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match Option::<HexStrOrUnsigned>::deserialize_as(deserializer) {
+            Ok(value) => Ok(DisplayOption(value)),
+            Err(error) => panic!("{}", error),
+        }
+    }
+}
+
+impl<T> SerializeAs<DisplayOption<T>> for Option<T>
 where
-    T: fmt::Display + Default,
-    U: SerializeAs<T> + fmt::Display + Default,
+    T: Serialize + fmt::Display + Default,
 {
     fn serialize_as<S>(source: &DisplayOption<T>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         match source.0 {
-            Some(ref value) => serializer.serialize_some(&SerializeAsWrap::<T, U>::new(value)),
+            Some(ref value) => serializer.serialize_some(&value),
+            None => serializer.serialize_none(),
+        }
+    }
+}
+
+impl SerializeAs<DisplayOption<u64>> for Option<HexStrOrUnsigned> {
+    fn serialize_as<S>(source: &DisplayOption<u64>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match source.0 {
+            Some(ref value) => {
+                serializer.serialize_some(&SerializeAsWrap::<u64, HexStrOrUnsigned>::new(value))
+            }
             None => serializer.serialize_none(),
         }
     }

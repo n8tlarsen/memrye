@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_with::serde_as;
+use tabled::Tabled;
 
 #[derive(Deserialize, Serialize, JsonSchema, Display, Debug, Clone)]
 #[cfg_attr(test, derive(PartialEq))]
@@ -94,8 +95,15 @@ pub enum Value {
     Float(f64),
 }
 
+impl Default for Value {
+    fn default() -> Self {
+        Value::String(String::default())
+    }
+}
+
 #[serde_as]
-#[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
+#[derive(Tabled, Deserialize, Serialize, JsonSchema, Debug, Clone)]
+#[tabled(rename_all = "Upper Title Case")]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct Field {
     name: String,
@@ -103,30 +111,34 @@ pub struct Field {
     /// If no offset is provided, elaboration assumes the field is packed directly following the
     /// previously defined field. If no prior field exists, elaboration assumes the field exists
     /// at offset zero.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "DisplayOption::is_none")]
+    #[serde(default, skip_serializing_if = "DisplayOption::is_none")]
     #[serde_as(as = "Option<HexStrOrUnsigned>")]
     offset: DisplayOption<u64>,
     /// Field accessibility.
     /// If no accessibility is specified, elaboration assumes the field inherits
     /// access from its parent context
-    #[serde(skip_serializing_if = "Option::is_none")]
-    access: Option<Access>,
+    #[serde(default, skip_serializing_if = "DisplayOption::is_none")]
+    #[serde_as(as = "Option<Access>")]
+    access: DisplayOption<Access>,
     /// Field type
     #[serde(flatten)]
     field_type: FieldType,
     /// The default value of the field.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    value: Option<Value>,
+    #[serde(default, skip_serializing_if = "DisplayOption::is_none")]
+    #[serde_as(as = "Option<Value>")]
+    value: DisplayOption<Value>,
     /// The unit of measurement of a numeric type. Ignored for other types.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    unit: Option<String>,
+    #[serde(default, skip_serializing_if = "DisplayOption::is_none")]
+    #[serde_as(as = "Option<String>")]
+    unit: DisplayOption<String>,
     /// The minimum allowed value of a numeric type. Ignored for other types.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    min: Option<f64>,
+    #[serde(default, skip_serializing_if = "DisplayOption::is_none")]
+    #[serde_as(as = "Option<f64>")]
+    min: DisplayOption<f64>,
     /// The maximum allowed value of a numeric type. Ignored for other types.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    max: Option<f64>,
+    #[serde(default, skip_serializing_if = "DisplayOption::is_none")]
+    #[serde_as(as = "Option<f64>")]
+    max: DisplayOption<f64>,
 }
 
 impl Field {
@@ -173,7 +185,7 @@ impl Field {
         match result {
             Ok(update_value) => {
                 if update_value.is_some() {
-                    self.value = update_value;
+                    self.value.0 = update_value;
                 }
                 Ok(())
             }
@@ -182,7 +194,7 @@ impl Field {
     }
 
     fn resolve_field_type_string(&self, length: &u32) -> Result<Option<Value>, anyhow::Error> {
-        if let Some(value) = &self.value {
+        if let Some(value) = &self.value.0 {
             if let Value::String(string) = value {
                 if (string.len() as u32) > *length {
                     let error = anyhow!("Provided string value is longer than the field type");
@@ -209,7 +221,7 @@ impl Field {
         length: &u32,
         map: &EnumMap,
     ) -> Result<Option<Value>, anyhow::Error> {
-        if let Some(value) = &self.value {
+        if let Some(value) = &self.value.0 {
             match value {
                 Value::Unsigned(number) => {
                     if *number > 2u64.pow(*length) - 1 {
@@ -262,7 +274,7 @@ impl Field {
     }
 
     fn resolve_field_type_bit(&self) -> Result<Option<Value>, anyhow::Error> {
-        if let Some(value) = &self.value {
+        if let Some(value) = &self.value.0 {
             if let Value::Bool(..) = value {
                 Ok(None)
             } else {
@@ -281,7 +293,7 @@ impl Field {
 
     fn resolve_field_type_unsigned(&self, length: &u32) -> Result<Option<Value>, anyhow::Error> {
         // Validate the value and length
-        if let Some(value) = &self.value {
+        if let Some(value) = &self.value.0 {
             if let Value::Unsigned(number) = value {
                 if *number > 2u64.pow(*length) - 1 {
                     let error = anyhow!(format!(
@@ -308,7 +320,7 @@ impl Field {
 
     fn resolve_field_type_signed(&self, length: &u32) -> Result<Option<Value>, anyhow::Error> {
         // Validate the value and length
-        if let Some(value) = &self.value {
+        if let Some(value) = &self.value.0 {
             if let Value::Signed(number) = value {
                 if (*number > 2i64.pow(*length - 1) - 1) || (*number < -2i64.pow(*length - 1)) {
                     let error = anyhow!(format!(
@@ -339,7 +351,7 @@ impl Field {
         low: &i32,
     ) -> Result<Option<Value>, anyhow::Error> {
         // Validate the value and length
-        if let Some(value) = &self.value {
+        if let Some(value) = &self.value.0 {
             // TODO: Allow unsigned conversion to float
             if let Value::Float(number) = value {
                 let max = 2f64.powf(*high as f64) - 2f64.powf(*low as f64);
@@ -372,7 +384,7 @@ impl Field {
         low: &i32,
     ) -> Result<Option<Value>, anyhow::Error> {
         // Validate the value and length
-        if let Some(value) = &self.value {
+        if let Some(value) = &self.value.0 {
             if let Value::Float(number) = value {
                 let max = 2f64.powf((*high - 1) as f64) - 2f64.powf(*low as f64);
                 let min = -2f64.powf((*high - 1) as f64);

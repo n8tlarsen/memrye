@@ -10,8 +10,7 @@ pub use protocol::Protocol;
 pub use serde_helpers::{DisplayOption, EnumMap, HexStrOrUnsigned, IntegerOrString};
 
 use derive_more::Display;
-use schemars::schema_for;
-use schemars::JsonSchema;
+use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 use serde_json::ser::PrettyFormatter;
 use serde_with::{formats::PreferOne, serde_as, DefaultOnNull, OneOrMany};

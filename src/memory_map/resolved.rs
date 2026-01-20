@@ -7,7 +7,7 @@ use std::fmt;
 use std::io::Write;
 use tabled::Tabled;
 
-use super::{Composite, DisplayOption, MemoryMap};
+use super::{Composite, DisplayOption, Field, MemoryMap};
 
 #[derive(Debug, Display, Clone)]
 pub enum LinkOrType {
@@ -57,29 +57,7 @@ pub struct ResolvedEntry {
     value: Value,
 }
 
-#[derive(Tabled, Debug, Clone)]
-#[tabled(rename_all = "Upper Title Case")]
-pub struct ResolvedField {
-    /// Bit offset from the beginning of the entry.
-    offset: Range,
-    /// Name of the field
-    name: String,
-    /// Field accessibility.
-    access: Access,
-    /// Field type
-    #[tabled(rename = "Type")]
-    field_type: FieldType,
-    /// The unit of measurement of a numeric type. Ignored for other types.
-    unit: DisplayOption<String>,
-    /// The minimum allowed value of a numeric type. Ignored for other types.
-    minimum: DisplayOption<f64>,
-    /// The maximum allowed value of a numeric type. Ignored for other types.
-    maximum: DisplayOption<f64>,
-    /// The default value of the field.
-    value: Value,
-}
-
-struct SectionTable<T> {
+pub struct SectionTable<T> {
     name: String,
     table: Vec<T>,
 }
@@ -100,13 +78,18 @@ impl<T> SectionTable<T> {
 #[derive(Default)]
 pub struct ResolvedMemoryMap {
     entries: Vec<SectionTable<ResolvedEntry>>,
-    fields: Vec<SectionTable<ResolvedField>>,
+    fields: Vec<SectionTable<Field>>,
 }
 
 impl ResolvedMemoryMap {
     pub fn new_entry_table(&mut self, name: &str) -> &mut SectionTable<ResolvedEntry> {
         self.entries.push(SectionTable::new(name));
         self.entries.last_mut().unwrap()
+    }
+
+    pub fn new_field_table(&mut self, name: &str) -> &mut SectionTable<Field> {
+        self.fields.push(SectionTable::new(name));
+        self.fields.last_mut().unwrap()
     }
 
     pub fn render(&self) -> String {
