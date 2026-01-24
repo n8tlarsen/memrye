@@ -2,12 +2,14 @@ use crate::memory_map::{
     field::{FieldType, Value},
     Access,
 };
+use anyhow::anyhow;
 use derive_more::Display;
+use std::collections::BTreeMap;
 use std::fmt;
 use std::io::Write;
 use tabled::Tabled;
 
-use super::{Composite, DisplayOption, Field, MemoryMap};
+use super::{Array, Cluster, Composite, DisplayOption, Entry, Field, MemoryMap};
 
 #[derive(Debug, Display, Clone)]
 pub enum LinkOrType {
@@ -57,39 +59,32 @@ pub struct ResolvedEntry {
     value: Value,
 }
 
-pub struct SectionTable<T> {
-    name: String,
-    table: Vec<T>,
-}
-
-impl<T> SectionTable<T> {
-    pub fn new(name: &str) -> Self {
-        SectionTable {
-            name: name.to_string(),
-            table: Vec::new(),
-        }
-    }
-
-    pub fn push(&mut self, value: T) {
-        self.table.push(value)
-    }
-}
-
 #[derive(Default)]
 pub struct ResolvedMemoryMap {
-    entries: Vec<SectionTable<ResolvedEntry>>,
-    fields: Vec<SectionTable<Field>>,
+    entries: BTreeMap<String, Vec<ResolvedEntry>>,
+    fields: BTreeMap<String, Vec<Field>>,
 }
 
 impl ResolvedMemoryMap {
-    pub fn new_entry_table(&mut self, name: &str) -> &mut SectionTable<ResolvedEntry> {
-        self.entries.push(SectionTable::new(name));
-        self.entries.last_mut().unwrap()
+    pub fn new_entry_table(
+        &mut self,
+        name: &str,
+    ) -> Result<&mut Vec<ResolvedEntry>, anyhow::Error> {
+        let duplicate = self.entries.insert(name.to_string(), Vec::new());
+        if duplicate.is_some() {
+            Err(anyhow!("Cluster name {} already exists.", name))
+        } else {
+            Ok(self.entries.get_mut(name).unwrap())
+        }
     }
 
-    pub fn new_field_table(&mut self, name: &str) -> &mut SectionTable<Field> {
-        self.fields.push(SectionTable::new(name));
-        self.fields.last_mut().unwrap()
+    pub fn new_field_table(&mut self, name: &str) -> Result<&mut Vec<Field>, anyhow::Error> {
+        let duplicate = self.fields.insert(name.to_string(), Vec::new());
+        if duplicate.is_some() {
+            Err(anyhow!("Cluster name {} already exists.", name))
+        } else {
+            Ok(self.fields.get_mut(name).unwrap())
+        }
     }
 
     pub fn render(&self) -> String {
@@ -104,18 +99,84 @@ impl ResolvedMemoryMap {
     {
         Result::Ok(())
     }
-}
 
-impl From<MemoryMap> for ResolvedMemoryMap {
-    fn from(value: MemoryMap) -> Self {
-        let resolved = ResolvedMemoryMap::default();
-        let defs = ResolvedMemoryMap::default();
+    fn resolve_cluster(&mut self, cluster: &Cluster, defs: &ResolvedMemoryMap) {
+        let mut table = self.new_entry_table(cluster.name());
+        // for item in cluster {
+        //     match item {
+        //         Composite::Entry()
+        //     }
+        // }
+    }
+
+    pub fn resolve(value: MemoryMap) -> Self {
+        let mut resolved = ResolvedMemoryMap::default();
+        let mut defs = ResolvedMemoryMap::default();
         for def in value.def.iter() {
-            // if let Composite::Entry(entry) = def {
-            //     defs.
-            // } else {
-            // }
+            match def {
+                Composite::Entry(entry) => {}
+                Composite::Array(array) => {}
+                Composite::Cluster(cluster) => {
+                    let table = defs.new_entry_table(cluster.name());
+                }
+                Composite::Reference { .. } => {}
+                Composite::Map { .. } => {}
+            }
         }
         resolved
+    }
+}
+
+pub struct MemoryTableIter {
+    entry_iter: <BTreeMap<String, Vec<ResolvedEntry>> as IntoIterator>::IntoIter,
+    field_iter: <BTreeMap<String, Vec<Field>> as IntoIterator>::IntoIter,
+    next_field: bool,
+}
+
+pub enum EntryOrField {
+    Entry((String, Vec<ResolvedEntry>)),
+    Field((String, Vec<Field>)),
+}
+
+impl Iterator for MemoryTableIter {
+    type Item = EntryOrField;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.next_field {
+            false => match self.entry_iter.next() {
+                Some(table) => Some(EntryOrField::Entry(table)),
+                None => {
+                    self.next_field = true;
+                    self.next()
+                }
+            },
+            true => self.field_iter.next().map(EntryOrField::Field),
+        }
+    }
+}
+
+impl IntoIterator for ResolvedMemoryMap {
+    type Item = EntryOrField;
+    type IntoIter = MemoryTableIter;
+    fn into_iter(self) -> Self::IntoIter {
+        MemoryTableIter {
+            entry_iter: self.entries.into_iter(),
+            field_iter: self.fields.into_iter(),
+            next_field: false,
+        }
+    }
+}
+
+impl Extend<EntryOrField> for ResolvedMemoryMap {
+    fn extend<T: IntoIterator<Item = EntryOrField>>(&mut self, iter: T) {
+        for item in iter {
+            match item {
+                EntryOrField::Entry(entry) => {
+                    self.entries.insert(entry.0, entry.1);
+                }
+                EntryOrField::Field(field) => {
+                    self.fields.insert(field.0, field.1);
+                }
+            }
+        }
     }
 }

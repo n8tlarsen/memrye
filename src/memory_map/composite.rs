@@ -31,6 +31,12 @@ pub struct Array {
     increment: Option<u64>,
 }
 
+impl Array {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
 #[serde_as]
 #[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
 #[cfg_attr(test, derive(PartialEq))]
@@ -43,6 +49,20 @@ pub struct Cluster {
     access: Option<Access>,
     #[serde_as(as = "OneOrMany<_,PreferOne>")]
     elements: Vec<Composite>,
+}
+
+impl Cluster {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+impl IntoIterator for Cluster {
+    type Item = Composite;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.elements.into_iter()
+    }
 }
 
 #[serde_as]
@@ -60,6 +80,12 @@ pub struct Entry {
     #[serde(default)]
     #[serde_as(as = "DefaultOnNull<OneOrMany<_,PreferOne>>")]
     fields: Vec<Field>,
+}
+
+impl Entry {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 }
 
 #[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
