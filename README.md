@@ -1,2 +1,2 @@
-# vhdl_doc
-Documentation engine producing symbols and memory descriptions for HDL modules
+# memrye
+Compositor for building memory-mapped systems, grain by grain.
