@@ -9,11 +9,13 @@ pub use field::Field;
 pub use protocol::Protocol;
 pub use serde_helpers::{DisplayOption, EnumMap, HexStrOrUnsigned, IntegerOrString};
 
+use anyhow::anyhow;
 use derive_more::Display;
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 use serde_json::ser::PrettyFormatter;
 use serde_with::{formats::PreferOne, serde_as, DefaultOnNull, OneOrMany};
+use std::collections::{BTreeMap, HashMap};
 
 #[derive(Deserialize, Serialize, JsonSchema, Display, Default, Debug, Copy, Clone)]
 #[cfg_attr(test, derive(PartialEq))]
@@ -48,6 +50,18 @@ pub struct MemoryMap {
     pub(crate) def: Vec<Composite>,
 }
 
+impl MemoryMap {
+    pub fn get_def_map(&self) -> Result<HashMap<String, &Composite>, anyhow::Error> {
+        let mut def_map = HashMap::with_capacity(self.def.len());
+        for def in &self.def {
+            if def_map.insert(def.name().to_string(), def).is_some() {
+                return Err(anyhow!("Definition \"{}\" already exists.", def.name()));
+            }
+        }
+        Ok(def_map)
+    }
+}
+
 pub fn get_memory_map_schema() -> String {
     let schema = schema_for!(MemoryMap);
     let formatter = PrettyFormatter::with_indent(b"    ");
@@ -55,4 +69,9 @@ pub fn get_memory_map_schema() -> String {
     let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
     serde::Serialize::serialize(&schema, &mut ser).expect("Failed to serialize schema");
     String::from_utf8(buf).expect("Failed to convert serial buffer to string")
+}
+
+pub trait Name {
+    fn name(&self) -> &str;
+    fn type_name() -> &'static str;
 }

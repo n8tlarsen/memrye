@@ -1,7 +1,22 @@
-use crate::memory_map::{Access, Field, HexStrOrUnsigned, IntegerOrString};
+use crate::memory_map::resolved::ResolvedEntry;
+use crate::memory_map::{Access, Field, HexStrOrUnsigned, IntegerOrString, Name, Protocol};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::{formats::PreferOne, serde_as, DefaultOnNull, OneOrMany};
+use std::collections::HashMap;
+
+pub trait Resolver {
+    /// Resolve the composite type for tabular presentation
+    fn resolve(
+        &self,
+        address: &mut u64,
+        table: &Vec<ResolvedEntry>,
+        def_map: &HashMap<String, &Composite>,
+        protocol: &Protocol,
+    );
+    /// Return the size of the composite in bytes
+    fn size(&self, def_map: &HashMap<String, &Composite>) -> u64;
+}
 
 #[serde_as]
 #[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
@@ -27,13 +42,60 @@ pub struct Array {
     access: Option<Access>,
     elements: Box<Composite>,
     index: Index,
+    /// Increment or stride length in bytes
     #[serde_as(as = "Option<HexStrOrUnsigned>")]
     increment: Option<u64>,
 }
 
-impl Array {
-    pub fn name(&self) -> &str {
+impl Resolver for Array {
+    fn resolve(
+        &self,
+        address: &mut u64,
+        table: &Vec<ResolvedEntry>,
+        def_map: &HashMap<String, &Composite>,
+        protocol: &Protocol,
+    ) {
+        let index_slice: Vec<Option<String>> = match &self.index {
+            Index::Length(len) => (0u64..*len)
+                .into_iter()
+                .map(|x| Some(x.to_string()))
+                .collect(),
+            Index::Range { high, low } => (*low..*high)
+                .into_iter()
+                .map(|x| Some(x.to_string()))
+                .collect(),
+            Index::List(list) => list.to_vec(),
+        };
+        let increment = if let Some(incr) = self.increment {
+            incr
+        } else {
+            (*self.elements).size(def_map)
+        };
+        for i in index_slice {
+            if let Some(index_string) = i {
+                (*self.elements).resolve(address, table, def_map, protocol);
+            }
+            *address += increment;
+        }
+        match &(*self.elements) {
+            Composite::Entry(entry) => {}
+            Composite::Array(array) => {}
+            Composite::Cluster(cluster) => cluster.resolve(address, table, def_map, protocol),
+            Composite::Reference { .. } => {}
+            Composite::Map { .. } => {}
+        }
+    }
+    fn size(&self, def_map: &HashMap<String, &Composite>) -> u64 {
+        0u64
+    }
+}
+
+impl Name for Array {
+    fn name(&self) -> &str {
         &self.name
+    }
+    fn type_name() -> &'static str {
+        "Array"
     }
 }
 
@@ -51,9 +113,35 @@ pub struct Cluster {
     elements: Vec<Composite>,
 }
 
-impl Cluster {
-    pub fn name(&self) -> &str {
+impl Resolver for Cluster {
+    fn resolve(
+        &self,
+        address: &mut u64,
+        table: &Vec<ResolvedEntry>,
+        def_map: &HashMap<String, &Composite>,
+        protocol: &Protocol,
+    ) {
+        for item in self.into_iter() {
+            match item {
+                Composite::Entry(entry) => {}
+                Composite::Array(array) => array.resolve(address, table, def_map, protocol),
+                Composite::Cluster(cluster) => cluster.resolve(address, table, def_map, protocol),
+                Composite::Reference { .. } => {}
+                Composite::Map { .. } => {}
+            }
+        }
+    }
+    fn size(&self, def_map: &HashMap<String, &Composite>) -> u64 {
+        0u64
+    }
+}
+
+impl Name for Cluster {
+    fn name(&self) -> &str {
         &self.name
+    }
+    fn type_name() -> &'static str {
+        "Cluster"
     }
 }
 
@@ -62,6 +150,22 @@ impl IntoIterator for Cluster {
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
         self.elements.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a Cluster {
+    type Item = &'a Composite;
+    type IntoIter = std::slice::Iter<'a, Composite>;
+    fn into_iter(self) -> Self::IntoIter {
+        (&self.elements).iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut Cluster {
+    type Item = &'a mut Composite;
+    type IntoIter = std::slice::IterMut<'a, Composite>;
+    fn into_iter(self) -> Self::IntoIter {
+        (&mut self.elements).iter_mut()
     }
 }
 
@@ -82,9 +186,26 @@ pub struct Entry {
     fields: Vec<Field>,
 }
 
-impl Entry {
-    pub fn name(&self) -> &str {
+impl Resolver for Entry {
+    fn resolve(
+        &self,
+        address: &mut u64,
+        table: &Vec<ResolvedEntry>,
+        def_map: &HashMap<String, &Composite>,
+        protocol: &Protocol,
+    ) {
+    }
+    fn size(&self, _def_map: &HashMap<String, &Composite>) -> u64 {
+        self.bytes.into()
+    }
+}
+
+impl Name for Entry {
+    fn name(&self) -> &str {
         &self.name
+    }
+    fn type_name() -> &'static str {
+        "Entry"
     }
 }
 
@@ -105,4 +226,40 @@ pub enum Composite {
         #[garde(pattern(r"[-_ A-Za-z0-9\/]*"))]
         map: String,
     },
+}
+
+impl Resolver for Composite {
+    fn resolve(
+        &self,
+        address: &mut u64,
+        table: &Vec<ResolvedEntry>,
+        def_map: &HashMap<String, &Composite>,
+        protocol: &Protocol,
+    ) {
+        match self {
+            Composite::Array(array) => array.resolve(address, table, def_map, protocol),
+            Composite::Cluster(cluster) => cluster.resolve(address, table, def_map, protocol),
+            Composite::Entry(entry) => entry.resolve(address, table, def_map, protocol),
+            Composite::Reference { reference } => {}
+            Composite::Map { map } => {}
+        }
+    }
+    fn size(&self, def_map: &HashMap<String, &Composite>) -> u64 {
+        0u64
+    }
+}
+
+impl Name for Composite {
+    fn name(&self) -> &str {
+        match self {
+            Composite::Array(array) => array.name(),
+            Composite::Cluster(cluster) => cluster.name(),
+            Composite::Entry(entry) => entry.name(),
+            Composite::Reference { reference } => reference,
+            Composite::Map { map } => map,
+        }
+    }
+    fn type_name() -> &'static str {
+        "Composite"
+    }
 }

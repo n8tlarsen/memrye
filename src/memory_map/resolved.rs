@@ -1,15 +1,16 @@
 use crate::memory_map::{
+    composite::Resolver,
     field::{FieldType, Value},
     Access,
 };
 use anyhow::anyhow;
 use derive_more::Display;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::io::Write;
 use tabled::Tabled;
 
-use super::{Array, Cluster, Composite, DisplayOption, Entry, Field, MemoryMap};
+use super::{Array, Cluster, Composite, DisplayOption, Entry, Field, MemoryMap, Name};
 
 #[derive(Debug, Display, Clone)]
 pub enum LinkOrType {
@@ -65,14 +66,54 @@ pub struct ResolvedMemoryMap {
     fields: BTreeMap<String, Vec<Field>>,
 }
 
+#[derive(Debug, Clone)]
+pub struct ResolveError {
+    message: String,
+}
+
+impl ResolveError {
+    fn duplicate<T, U>(_first: T, second: U) -> Self
+    where
+        T: Name,
+        U: Name,
+    {
+        ResolveError {
+            message: format!(
+                "Found duplicate name \"{}\". First instance is composite \"{}\"; second instance is composite \"{}\"",
+                second.name(),
+                T::type_name(),
+                U::type_name()
+            ),
+        }
+    }
+    fn duplicate_cluster(name: &str) -> Self {
+        ResolveError {
+            message: format!("Found duplicate cluster name \"{}\". Resolve the conflict or consider using a reference.", name),
+        }
+    }
+    fn def_not_found(item: String) -> Self {
+        ResolveError {
+            message: format!("Definition {} not found in document", item),
+        }
+    }
+    fn map_not_found(item: String) -> Self {
+        ResolveError {
+            message: format!("Map file {} not found", item),
+        }
+    }
+}
+
+impl fmt::Display for ResolveError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
 impl ResolvedMemoryMap {
-    pub fn new_entry_table(
-        &mut self,
-        name: &str,
-    ) -> Result<&mut Vec<ResolvedEntry>, anyhow::Error> {
+    pub fn new_entry_table(&mut self, name: &str) -> Result<&mut Vec<ResolvedEntry>, ResolveError> {
         let duplicate = self.entries.insert(name.to_string(), Vec::new());
         if duplicate.is_some() {
-            Err(anyhow!("Cluster name {} already exists.", name))
+            Err(ResolveError::duplicate_cluster(name))
         } else {
             Ok(self.entries.get_mut(name).unwrap())
         }
@@ -81,7 +122,7 @@ impl ResolvedMemoryMap {
     pub fn new_field_table(&mut self, name: &str) -> Result<&mut Vec<Field>, anyhow::Error> {
         let duplicate = self.fields.insert(name.to_string(), Vec::new());
         if duplicate.is_some() {
-            Err(anyhow!("Cluster name {} already exists.", name))
+            Err(anyhow!("Field name {} already exists.", name))
         } else {
             Ok(self.fields.get_mut(name).unwrap())
         }
@@ -100,30 +141,26 @@ impl ResolvedMemoryMap {
         Result::Ok(())
     }
 
-    fn resolve_cluster(&mut self, cluster: &Cluster, defs: &ResolvedMemoryMap) {
-        let mut table = self.new_entry_table(cluster.name());
-        // for item in cluster {
-        //     match item {
-        //         Composite::Entry()
-        //     }
-        // }
-    }
-
-    pub fn resolve(value: MemoryMap) -> Self {
+    pub fn resolve(mm: &MemoryMap) -> Result<Self, ResolveError> {
         let mut resolved = ResolvedMemoryMap::default();
-        let mut defs = ResolvedMemoryMap::default();
-        for def in value.def.iter() {
-            match def {
-                Composite::Entry(entry) => {}
-                Composite::Array(array) => {}
-                Composite::Cluster(cluster) => {
-                    let table = defs.new_entry_table(cluster.name());
+        let anonymous = resolved.new_entry_table("Anonymous")?;
+        let base_address = 0u64;
+        let mut address = 0u64;
+        if let Ok(def_map) = mm.get_def_map() {
+            for item in mm.map.iter() {
+                match item {
+                    Composite::Entry(entry) => {}
+                    Composite::Array(array) => {}
+                    Composite::Cluster(cluster) => {
+                        let table = resolved.new_entry_table(cluster.name())?;
+                        cluster.resolve(&mut address, table, &def_map, &mm.protocol);
+                    }
+                    Composite::Reference { .. } => {}
+                    Composite::Map { .. } => {}
                 }
-                Composite::Reference { .. } => {}
-                Composite::Map { .. } => {}
             }
         }
-        resolved
+        Ok(resolved)
     }
 }
 
