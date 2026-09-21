@@ -1,12 +1,12 @@
-pub mod composite;
 pub mod field;
 pub mod protocol;
+pub mod record;
 pub mod resolved;
 pub mod serde_helpers;
 
-pub use composite::{Array, Cluster, Composite, Entry};
 pub use field::Field;
 pub use protocol::Protocol;
+pub use record::{Array, Cluster, Entry, Record, Serial};
 pub use serde_helpers::{DisplayOption, EnumMap, HexStrOrUnsigned, IntegerOrString};
 
 use derive_more::Display;
@@ -110,15 +110,15 @@ pub struct MemoryMap {
     pub(crate) protocol: Protocol,
     #[serde(rename = "&map")]
     #[serde_as(as = "OneOrMany<_,PreferOne>")]
-    pub(crate) map: Vec<Composite>,
+    pub(crate) map: Vec<Record>,
     #[serde(rename = "&def")]
     #[serde(default)]
     #[serde_as(as = "DefaultOnNull<OneOrMany<_,PreferOne>>")]
-    pub(crate) def: Vec<Composite>,
+    pub(crate) def: Vec<Record>,
 }
 
 impl MemoryMap {
-    pub fn get_def_map(&self) -> Result<HashMap<String, &Composite>, ResolveError> {
+    pub fn get_def_map(&self) -> Result<HashMap<String, &Record>, ResolveError> {
         let mut def_map = HashMap::with_capacity(self.def.len());
         for def in &self.def {
             let def_string = def.name().to_string();

@@ -1,6 +1,6 @@
 use crate::memory_map::{
-    composite::Resolver,
     field::{FieldType, Value},
+    record::Resolver,
     Access, ResolveError,
 };
 use anyhow::anyhow;
@@ -10,7 +10,7 @@ use std::fmt;
 use std::io::Write;
 use tabled::Tabled;
 
-use super::{Array, Cluster, Composite, DisplayOption, Entry, Field, MemoryMap, Name};
+use super::{Array, Cluster, DisplayOption, Entry, Field, MemoryMap, Name, Record};
 
 #[derive(Debug, Display, Clone)]
 pub enum LinkOrType {
@@ -128,19 +128,19 @@ impl ResolvedMemoryMap {
         // Recursively resolve the map
         for item in mm.map.iter() {
             match item {
-                Composite::Entry(entry) => {
+                Record::Entry(entry) => {
                     entry.resolve(&mut address, "Anonymous", &def_map, &mm.protocol);
                 }
-                Composite::Array(array) => {
+                Record::Array(array) => {
                     array.resolve(&mut address, "Anonymous", &def_map, &mm.protocol);
                 }
-                Composite::Cluster(cluster) => {
+                Record::Cluster(cluster) => {
                     let name = cluster.name();
                     resolved.new_entry_table(name)?;
                     cluster.resolve(&mut address, name, &def_map, &mm.protocol);
                 }
-                Composite::Reference { .. } => {}
-                Composite::Map { .. } => {}
+                Record::Reference { .. } => {}
+                Record::Map { .. } => {}
             }
         }
         Ok(resolved)
