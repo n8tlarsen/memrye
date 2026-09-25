@@ -1,5 +1,5 @@
 [package]
-name = "vhdl_doc"
+name = "memrye"
 version = "0.1.0"
 edition = "2024"
 

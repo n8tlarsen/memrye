@@ -1,7 +1,7 @@
+use memrye::memory_map::{EnumMap, MemoryMap};
 use serde_json::json;
 use std::collections::BTreeMap;
 use toml::toml;
-use vhdl_doc::memory_map::{EnumMap, MemoryMap};
 
 #[test]
 pub fn enum_map_json() {
