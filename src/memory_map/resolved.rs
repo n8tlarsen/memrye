@@ -5,7 +5,7 @@ use crate::memory_map::{
 };
 use anyhow::anyhow;
 use derive_more::Display;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::io::Write;
 use tabled::Tabled;
@@ -60,10 +60,30 @@ pub struct ResolvedEntry {
     value: Value,
 }
 
+impl PartialEq for ResolvedEntry {
+    fn eq(&self, other: &Self) -> bool {
+        self.address.eq(&other.address)
+    }
+}
+
+impl Eq for ResolvedEntry {}
+
+impl PartialOrd for ResolvedEntry {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ResolvedEntry {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.address.cmp(&other.address)
+    }
+}
+
 #[derive(Default)]
 pub struct ResolvedMemoryMap {
-    entries: BTreeMap<String, Vec<ResolvedEntry>>,
-    fields: BTreeMap<String, Vec<Field>>,
+    entries: BTreeMap<String, BTreeSet<ResolvedEntry>>,
+    fields: BTreeMap<String, BTreeSet<Field>>,
 }
 
 impl ResolvedMemoryMap {
@@ -73,15 +93,20 @@ impl ResolvedMemoryMap {
         new: ResolvedEntry,
     ) -> Result<(), ResolveError> {
         if let Some(tb) = self.entries.get_mut(key) {
-            tb.push(new);
-            Ok(())
+            let address = new.address;
+            let name = new.name.clone();
+            if tb.insert(new) {
+                Ok(())
+            } else {
+                Err(ResolveError::duplicate_entry(&name, &address, key))
+            }
         } else {
             Err(ResolveError::nonexist_entry_table(key))
         }
     }
 
     pub fn new_entry_table(&mut self, name: &str) -> Result<(), ResolveError> {
-        let duplicate = self.entries.insert(name.to_string(), Vec::new());
+        let duplicate = self.entries.insert(name.to_string(), BTreeSet::new());
         if duplicate.is_some() {
             Err(ResolveError::duplicate_entry_table(name))
         } else {
@@ -91,7 +116,7 @@ impl ResolvedMemoryMap {
 
     pub fn append_to_field_table(&mut self, key: &str, new: Field) -> Result<(), ResolveError> {
         if let Some(tb) = self.fields.get_mut(key) {
-            tb.push(new);
+            tb.insert(new);
             Ok(())
         } else {
             Err(ResolveError::nonexist_entry_table(key))
@@ -99,7 +124,7 @@ impl ResolvedMemoryMap {
     }
 
     pub fn new_field_table(&mut self, name: &str) -> Result<(), ResolveError> {
-        let duplicate = self.fields.insert(name.to_string(), Vec::new());
+        let duplicate = self.fields.insert(name.to_string(), BTreeSet::new());
         if duplicate.is_some() {
             Err(ResolveError::duplicate_field_table(name))
         } else {
@@ -148,14 +173,14 @@ impl ResolvedMemoryMap {
 }
 
 pub struct MemoryTableIter {
-    entry_iter: <BTreeMap<String, Vec<ResolvedEntry>> as IntoIterator>::IntoIter,
-    field_iter: <BTreeMap<String, Vec<Field>> as IntoIterator>::IntoIter,
+    entry_iter: <BTreeMap<String, BTreeSet<ResolvedEntry>> as IntoIterator>::IntoIter,
+    field_iter: <BTreeMap<String, BTreeSet<Field>> as IntoIterator>::IntoIter,
     next_field: bool,
 }
 
 pub enum EntryOrField {
-    Entry((String, Vec<ResolvedEntry>)),
-    Field((String, Vec<Field>)),
+    Entry((String, BTreeSet<ResolvedEntry>)),
+    Field((String, BTreeSet<Field>)),
 }
 
 impl Iterator for MemoryTableIter {

@@ -63,9 +63,25 @@ impl ResolveError {
             message: format!("Found duplicate cluster name \"{}\". Resolve the conflict or consider using a reference.", name),
         }
     }
+    fn duplicate_entry(name: &str, address: &u64, table: &str) -> Self {
+        ResolveError {
+            message: format!(
+                "Found duplicate entry with name \"{}\" at address {} in table \"{}\".",
+                name, address, table
+            ),
+        }
+    }
     fn duplicate_field_table(name: &str) -> Self {
         ResolveError {
             message: format!("Found duplicate entry name \"{}\". Resolve the conflict or consider using a reference.", name),
+        }
+    }
+    fn duplicate_field(name: &str, address: &u64, table: &str) -> Self {
+        ResolveError {
+            message: format!(
+                "Found duplicate field with name \"{}\" at address {} in table \"{}\".",
+                name, address, table
+            ),
         }
     }
     fn nonexist_entry_table(name: &str) -> Self {

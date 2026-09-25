@@ -104,7 +104,6 @@ impl Default for Value {
 #[serde_as]
 #[derive(Tabled, Deserialize, Serialize, JsonSchema, Debug, Clone)]
 #[tabled(rename_all = "Upper Title Case")]
-#[cfg_attr(test, derive(PartialEq))]
 pub struct Field {
     name: String,
     /// Bit offset from the beginning of the entry.
@@ -139,6 +138,26 @@ pub struct Field {
     #[serde(default, skip_serializing_if = "DisplayOption::is_none")]
     #[serde_as(as = "Option<f64>")]
     max: DisplayOption<f64>,
+}
+
+impl PartialEq for Field {
+    fn eq(&self, other: &Self) -> bool {
+        self.offset.eq(&other.offset)
+    }
+}
+
+impl Eq for Field {}
+
+impl PartialOrd for Field {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Field {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.offset.cmp(&other.offset)
+    }
 }
 
 impl Field {

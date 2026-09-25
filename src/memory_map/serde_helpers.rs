@@ -201,8 +201,7 @@ impl fmt::Display for EnumMap {
     }
 }
 
-#[derive(Default, Debug, Clone, Deserialize, Serialize)]
-#[cfg_attr(test, derive(PartialEq))]
+#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct DisplayOption<T>(pub Option<T>)
 where
     T: fmt::Display + Default;
@@ -216,6 +215,26 @@ where
     }
     pub fn is_none(&self) -> bool {
         self.0.is_none()
+    }
+}
+
+impl<T> Eq for DisplayOption<T> where T: fmt::Display + Default + Eq {}
+
+impl<T> PartialOrd for DisplayOption<T>
+where
+    T: fmt::Display + Default + PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+
+impl<T> Ord for DisplayOption<T>
+where
+    T: fmt::Display + Default + Ord,
+{
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.cmp(&other.0)
     }
 }
 
