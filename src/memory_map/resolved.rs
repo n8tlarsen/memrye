@@ -1,6 +1,6 @@
 use crate::memory_map::{
     field::{FieldType, Value},
-    record::Resolver,
+    record::{Parent, Resolver},
     Access, ResolveError,
 };
 use anyhow::anyhow;
@@ -147,22 +147,25 @@ impl ResolvedMemoryMap {
 
     pub fn resolve(mm: &MemoryMap) -> Result<Self, ResolveError> {
         let mut resolved = ResolvedMemoryMap::default();
-        let base_address = 0u64;
-        let mut address = 0u64;
         let def_map = mm.get_def_map()?;
+        let mut parent = Parent::default();
         // Recursively resolve the map
         for item in mm.map.iter() {
             match item {
                 Record::Entry(entry) => {
-                    entry.resolve(&mut address, "Anonymous", &def_map, &mm.protocol);
+                    entry.resolve(&parent, &def_map, &mm.protocol);
+                    parent.increment_address(entry.size(&def_map));
                 }
                 Record::Array(array) => {
-                    array.resolve(&mut address, "Anonymous", &def_map, &mm.protocol);
+                    array.resolve(&parent, &def_map, &mm.protocol);
+                    parent.increment_address(array.size(&def_map));
                 }
                 Record::Cluster(cluster) => {
                     let name = cluster.name();
                     resolved.new_entry_table(name)?;
-                    cluster.resolve(&mut address, name, &def_map, &mm.protocol);
+                    let child = Parent::default_with_table(name);
+                    cluster.resolve(&child, &def_map, &mm.protocol);
+                    parent.increment_address(cluster.size(&def_map));
                 }
                 Record::Reference { .. } => {}
                 Record::Map { .. } => {}

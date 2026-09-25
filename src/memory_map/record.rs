@@ -5,17 +5,49 @@ use serde::{Deserialize, Serialize};
 use serde_with::{formats::PreferOne, serde_as, DefaultOnNull, OneOrMany};
 use std::collections::HashMap;
 
+pub(crate) struct Parent<'a> {
+    table: &'a str,
+    address: u64,
+    access: Access,
+}
+
+impl<'a> Default for Parent<'a> {
+    fn default() -> Self {
+        Parent {
+            table: "Anonymous",
+            address: 0u64,
+            access: Access::Read,
+        }
+    }
+}
+
+impl<'a> Parent<'a> {
+    pub fn default_with_table(table: &'a str) -> Self {
+        Parent {
+            table,
+            address: 0u64,
+            access: Access::Read,
+        }
+    }
+    pub fn increment_address(&mut self, size: u64) {
+        self.address += size;
+    }
+    pub fn get_table(&self) -> &str {
+        self.table
+    }
+    pub fn get_address(&self) -> u64 {
+        self.address
+    }
+    pub fn get_access(&self) -> Access {
+        self.access
+    }
+}
+
 /// The resolver trait provides a common API for resolving optional fields of composite document
 /// elements
 pub trait Resolver {
     /// Resolve the composite type for tabular presentation
-    fn resolve(
-        &self,
-        address: &mut u64,
-        table: &str,
-        def_map: &HashMap<String, &Record>,
-        protocol: &Protocol,
-    );
+    fn resolve(&self, parent: &Parent, def_map: &HashMap<String, &Record>, protocol: &Protocol);
     /// Return the size of the composite in bytes
     fn size(&self, def_map: &HashMap<String, &Record>) -> u64;
 }
@@ -77,14 +109,7 @@ pub struct Array {
 }
 
 impl Resolver for Array {
-    fn resolve(
-        &self,
-        address: &mut u64,
-        table: &str,
-        def_map: &HashMap<String, &Record>,
-        protocol: &Protocol,
-    ) {
-    }
+    fn resolve(&self, parent: &Parent, def_map: &HashMap<String, &Record>, protocol: &Protocol) {}
     fn size(&self, def_map: &HashMap<String, &Record>) -> u64 {
         0u64
     }
@@ -95,7 +120,6 @@ impl Name for Array {
         match &self.element {
             Serial::Cluster(cluster) => cluster.name(),
             Serial::Entry(entry) => entry.name(),
-            Serial::Field(..) => "Field",
             Serial::Reference(..) => "Reference",
             Serial::Map(..) => "Map",
         }
@@ -121,21 +145,15 @@ pub struct Cluster {
 }
 
 impl Resolver for Cluster {
-    fn resolve(
-        &self,
-        address: &mut u64,
-        table: &str,
-        def_map: &HashMap<String, &Record>,
-        protocol: &Protocol,
-    ) {
+    fn resolve(&self, parent: &Parent, def_map: &HashMap<String, &Record>, protocol: &Protocol) {
         for item in self.into_iter() {
             match item {
-                Record::Entry(entry) => {}
-                Record::Array(array) => array.resolve(address, table, def_map, protocol),
-                Record::Cluster(cluster) => cluster.resolve(address, table, def_map, protocol),
+                Record::Entry(entry) => entry.resolve(parent, def_map, protocol),
+                Record::Array(array) => array.resolve(parent, def_map, protocol),
+                Record::Cluster(cluster) => cluster.resolve(parent, def_map, protocol),
                 Record::Reference { .. } => {}
                 Record::Map { .. } => {}
-            }
+            };
         }
     }
     fn size(&self, def_map: &HashMap<String, &Record>) -> u64 {
@@ -196,14 +214,7 @@ pub struct Entry {
 }
 
 impl Resolver for Entry {
-    fn resolve(
-        &self,
-        address: &mut u64,
-        table: &str,
-        def_map: &HashMap<String, &Record>,
-        protocol: &Protocol,
-    ) {
-    }
+    fn resolve(&self, parent: &Parent, def_map: &HashMap<String, &Record>, protocol: &Protocol) {}
     fn size(&self, _def_map: &HashMap<String, &Record>) -> u64 {
         self.bytes.into()
     }
@@ -241,17 +252,11 @@ pub enum Record {
 }
 
 impl Resolver for Record {
-    fn resolve(
-        &self,
-        address: &mut u64,
-        table: &str,
-        def_map: &HashMap<String, &Record>,
-        protocol: &Protocol,
-    ) {
+    fn resolve(&self, parent: &Parent, def_map: &HashMap<String, &Record>, protocol: &Protocol) {
         match self {
-            Record::Array(array) => array.resolve(address, table, def_map, protocol),
-            Record::Cluster(cluster) => cluster.resolve(address, table, def_map, protocol),
-            Record::Entry(entry) => entry.resolve(address, table, def_map, protocol),
+            Record::Array(array) => array.resolve(parent, def_map, protocol),
+            Record::Cluster(cluster) => cluster.resolve(parent, def_map, protocol),
+            Record::Entry(entry) => entry.resolve(parent, def_map, protocol),
             Record::Reference(reference) => {}
             Record::Map(map) => {}
         }
@@ -310,7 +315,6 @@ impl Name for &Record {
 pub enum Serial {
     Cluster(Cluster),
     Entry(Entry),
-    Field(Field),
     Reference(Reference),
     Map(Map),
 }
