@@ -24,6 +24,7 @@ pub trait Resolver {
 #[serde_as]
 #[derive(Deserialize, Serialize, JsonSchema, Debug, Clone)]
 #[cfg_attr(test, derive(PartialEq))]
+#[serde(rename_all = "lowercase")]
 pub enum Index {
     Length(u64),
     Range { high: u64, low: u64 },

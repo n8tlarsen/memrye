@@ -116,10 +116,9 @@ pub fn mm_array_all() {
         "addressUnit": 1,
         "addressAlign": 4,
         "&map" : {
-            "name": "Test Array",
             "address": "0x0000_1000",
             "access": "r",
-            "elements": {
+            "element": {
                 "name": "Test Entry",
                 "address": "0x0000_1000",
                 "access": "r",
@@ -137,7 +136,7 @@ pub fn mm_array_all() {
                     }}
                 ]
             },
-            "index": [1,2,null,null,5,6],
+            "index": {"list":[1,2,null,null,5,6]},
             "increment": 4
         }
     })
