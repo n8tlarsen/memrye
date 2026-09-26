@@ -4,7 +4,7 @@ pub mod record;
 pub mod resolved;
 pub mod serde_helpers;
 
-pub use field::Field;
+pub use field::{Field, FieldType, Value};
 pub use protocol::Protocol;
 pub use record::{Array, Cluster, Entry, Record, Serial};
 pub use serde_helpers::{DisplayOption, EnumMap, HexStrOrUnsigned, IntegerOrString};
@@ -108,6 +108,19 @@ impl ResolveError {
     fn map_not_found(item: String) -> Self {
         ResolveError {
             message: format!("Map file {} not found", item),
+        }
+    }
+    fn field_value_type_mismatch(value: &Value, field_type: &FieldType) -> Self {
+        ResolveError {
+            message: format!(
+                "Provided value {} doesn't match the field type {}",
+                value, field_type
+            ),
+        }
+    }
+    fn field_error(name: &str, msg: impl Into<String>) -> Self {
+        Self {
+            message: format!("Error in field {}: {}", name, msg.into()),
         }
     }
 }

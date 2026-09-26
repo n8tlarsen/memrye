@@ -1,5 +1,4 @@
-use crate::memory_map::{Access, DisplayOption, EnumMap, HexStrOrUnsigned};
-use anyhow::anyhow;
+use crate::memory_map::{Access, DisplayOption, EnumMap, HexStrOrUnsigned, ResolveError};
 use derive_more::Display;
 use log::{error, info};
 use schemars::JsonSchema;
@@ -161,6 +160,7 @@ impl Ord for Field {
 }
 
 impl Field {
+    /// Returns the length of the field in bits
     pub fn length(&self) -> u32 {
         match self.field_type {
             FieldType::Bit => 1,
@@ -177,18 +177,21 @@ impl Field {
         self.offset.0
     }
 
-    pub fn set_offset(&mut self, value: u64) -> Result<(), anyhow::Error> {
+    pub fn set_offset(&mut self, value: u64) -> Result<(), ResolveError> {
         if self.offset.0.is_none() {
             self.offset.0 = Some(value);
             Ok(())
         } else {
-            let error = anyhow!("Internal error. Attempted to overwrite provided field \"offset\"");
+            let error = ResolveError::field_error(
+                &self.name,
+                "Internal error. Attempted to overwrite provided field \"offset\"",
+            );
             error!("{}", error);
             Err(error)
         }
     }
 
-    pub fn resolve_value(&mut self) -> Result<(), anyhow::Error> {
+    pub fn resolve_value(&mut self) -> Result<(), ResolveError> {
         let result = match self.field_type {
             FieldType::String(ref length) => self.resolve_field_type_string(length),
             FieldType::Enum {
@@ -212,21 +215,21 @@ impl Field {
         }
     }
 
-    fn resolve_field_type_string(&self, length: &u32) -> Result<Option<Value>, anyhow::Error> {
+    fn resolve_field_type_string(&self, length: &u32) -> Result<Option<Value>, ResolveError> {
         if let Some(value) = &self.value.0 {
             if let Value::String(string) = value {
                 if (string.len() as u32) > *length {
-                    let error = anyhow!("Provided string value is longer than the field type");
+                    let error = ResolveError::field_error(
+                        &self.name,
+                        "Provided string value is longer than the field type",
+                    );
                     error!("{}", error);
                     Err(error)
                 } else {
                     Ok(None)
                 }
             } else {
-                let error = anyhow!(format!(
-                    "Provided value {} doesn't match the field type {}",
-                    value, &self.field_type
-                ));
+                let error = ResolveError::field_value_type_mismatch(value, &self.field_type);
                 error!("{}", error);
                 Err(error)
             }
@@ -239,12 +242,14 @@ impl Field {
         &self,
         length: &u32,
         map: &EnumMap,
-    ) -> Result<Option<Value>, anyhow::Error> {
+    ) -> Result<Option<Value>, ResolveError> {
         if let Some(value) = &self.value.0 {
             match value {
                 Value::Unsigned(number) => {
                     if *number > 2u64.pow(*length) - 1 {
-                        let error = anyhow!(format!(
+                        let error = ResolveError::field_error(
+                            &self.name,
+                            format!(
                                 "Numeric value {} requires more than {} bits specified by the field type",
                                 *number, *length
                             ));
@@ -252,10 +257,13 @@ impl Field {
                         return Err(error);
                     }
                     if !(map.0.contains_key(number)) {
-                        let error = anyhow!(format!(
-                                "Numeric value {} is not a value specified by the enum field type of field {}",
-                                *number, self.name
-                            ));
+                        let error = ResolveError::field_error(
+                            &self.name,
+                            format!(
+                                "Numeric value {} is not a value specified by the enum field type",
+                                *number
+                            ),
+                        );
                         error!("{}", error);
                         return Err(error);
                     }
@@ -263,10 +271,13 @@ impl Field {
                 }
                 Value::String(string) => {
                     if !(map.0.values().any(|x| *x == *string)) {
-                        let error = anyhow!(format!(
-                                "String value {} is not a key specified by the enum field type of field {}",
-                                *string, self.name
-                            ));
+                        let error = ResolveError::field_error(
+                            &self.name,
+                            format!(
+                                "String value {} is not a key specified by the enum field type",
+                                *string
+                            ),
+                        );
                         error!("{}", error);
                         Err(error)
                     } else {
@@ -274,10 +285,7 @@ impl Field {
                     }
                 }
                 _ => {
-                    let error = anyhow!(format!(
-                        "Provided value {} doesn't match the field type {}",
-                        value, &self.field_type
-                    ));
+                    let error = ResolveError::field_value_type_mismatch(value, &self.field_type);
                     error!("{}", error);
                     Err(error)
                 }
@@ -292,15 +300,12 @@ impl Field {
         }
     }
 
-    fn resolve_field_type_bit(&self) -> Result<Option<Value>, anyhow::Error> {
+    fn resolve_field_type_bit(&self) -> Result<Option<Value>, ResolveError> {
         if let Some(value) = &self.value.0 {
             if let Value::Bool(..) = value {
                 Ok(None)
             } else {
-                let error = anyhow!(format!(
-                    "Provided value {} doesn't match the field type {}",
-                    value, &self.field_type
-                ));
+                let error = ResolveError::field_value_type_mismatch(value, &self.field_type);
                 error!("{}", error);
                 Err(error)
             }
@@ -310,25 +315,25 @@ impl Field {
         }
     }
 
-    fn resolve_field_type_unsigned(&self, length: &u32) -> Result<Option<Value>, anyhow::Error> {
+    fn resolve_field_type_unsigned(&self, length: &u32) -> Result<Option<Value>, ResolveError> {
         // Validate the value and length
         if let Some(value) = &self.value.0 {
             if let Value::Unsigned(number) = value {
                 if *number > 2u64.pow(*length) - 1 {
-                    let error = anyhow!(format!(
+                    let error = ResolveError::field_error(
+                        &self.name,
+                        format!(
                         "Numeric value {} requires more than {} bits specified by the field type",
                         *number, *length
-                    ));
+                    ),
+                    );
                     error!("{}", error);
                     Err(error)
                 } else {
                     Ok(None)
                 }
             } else {
-                let error = anyhow!(format!(
-                    "Provided value {} doesn't match the field type {}",
-                    value, &self.field_type
-                ));
+                let error = ResolveError::field_value_type_mismatch(value, &self.field_type);
                 error!("{}", error);
                 Err(error)
             }
@@ -337,13 +342,15 @@ impl Field {
         }
     }
 
-    fn resolve_field_type_signed(&self, length: &u32) -> Result<Option<Value>, anyhow::Error> {
+    fn resolve_field_type_signed(&self, length: &u32) -> Result<Option<Value>, ResolveError> {
         // Validate the value and length
         if let Some(value) = &self.value.0 {
             if let Value::Signed(number) = value {
                 if (*number > 2i64.pow(*length - 1) - 1) || (*number < -2i64.pow(*length - 1)) {
-                    let error = anyhow!(format!(
-                        "Numeric value {} requires more than {} bits specified by the field type",
+                    let error = ResolveError::field_error(
+                        &self.name,
+                        format!(
+                            "Numeric value {} requires more than {} bits specified by the field type",
                         *number, *length
                     ));
                     error!("{}", error);
@@ -352,10 +359,7 @@ impl Field {
                     Ok(None)
                 }
             } else {
-                let error = anyhow!(format!(
-                    "Provided value {} doesn't match the field type {}",
-                    value, &self.field_type
-                ));
+                let error = ResolveError::field_value_type_mismatch(value, &self.field_type);
                 error!("{}", error);
                 Err(error)
             }
@@ -368,27 +372,27 @@ impl Field {
         &self,
         high: &i32,
         low: &i32,
-    ) -> Result<Option<Value>, anyhow::Error> {
+    ) -> Result<Option<Value>, ResolveError> {
         // Validate the value and length
         if let Some(value) = &self.value.0 {
             // TODO: Allow unsigned conversion to float
             if let Value::Float(number) = value {
                 let max = 2f64.powf(*high as f64) - 2f64.powf(*low as f64);
                 if (*number > max) || (*number < 0f64) {
-                    let error = anyhow!(format!(
-                        "Numeric value {} cannot be represented by the field type {}",
-                        *number, &self.field_type
-                    ));
+                    let error = ResolveError::field_error(
+                        &self.name,
+                        format!(
+                            "Numeric value {} cannot be represented by the field type {}",
+                            *number, &self.field_type
+                        ),
+                    );
                     error!("{}", error);
                     Err(error)
                 } else {
                     Ok(None)
                 }
             } else {
-                let error = anyhow!(format!(
-                    "Provided value {} doesn't match the field type unsigned",
-                    value,
-                ));
+                let error = ResolveError::field_value_type_mismatch(value, &self.field_type);
                 error!("{}", error);
                 Err(error)
             }
@@ -401,27 +405,27 @@ impl Field {
         &self,
         high: &i32,
         low: &i32,
-    ) -> Result<Option<Value>, anyhow::Error> {
+    ) -> Result<Option<Value>, ResolveError> {
         // Validate the value and length
         if let Some(value) = &self.value.0 {
             if let Value::Float(number) = value {
                 let max = 2f64.powf((*high - 1) as f64) - 2f64.powf(*low as f64);
                 let min = -2f64.powf((*high - 1) as f64);
                 if (*number > max) || (*number < min) {
-                    let error = anyhow!(format!(
-                        "Numeric value {} cannot be represented by the field type {}",
-                        *number, &self.field_type
-                    ));
+                    let error = ResolveError::field_error(
+                        &self.name,
+                        format!(
+                            "Numeric value {} cannot be represented by the field type {}",
+                            *number, &self.field_type
+                        ),
+                    );
                     error!("{}", error);
                     Err(error)
                 } else {
                     Ok(None)
                 }
             } else {
-                let error = anyhow!(format!(
-                    "Provided value {} doesn't match the field type unsigned",
-                    value,
-                ));
+                let error = ResolveError::field_value_type_mismatch(value, &self.field_type);
                 error!("{}", error);
                 Err(error)
             }
